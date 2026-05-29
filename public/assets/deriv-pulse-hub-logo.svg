@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f8fff" />
+      <stop offset="45%" stop-color="#2ed3ae" />
+      <stop offset="100%" stop-color="#16223a" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
+      <feMerge>
+        <feMergeNode in="coloredBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#grad)" />
+  <circle cx="60" cy="60" r="42" fill="#ffffff11" />
+  <path d="M42 38c0-3.3 2.7-6 6-6h12c3.3 0 6 2.7 6 6v7h-9v-5h-9v41h9v-18h9v18h9V45h-9V38h-9v5h-9v-5z" fill="#ffffff" filter="url(#glow)" opacity="0.96" />
+  <text x="60" y="102" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="12" fill="#ffffffaa">Deriv Pulse Hub</text>
+</svg>

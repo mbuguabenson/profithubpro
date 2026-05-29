@@ -1,0 +1,195 @@
+.risk-disclaimer-button {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    animation: slide-in-left 0.5s ease-out;
+
+    &__btn {
+        background: #3b6fa2 !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 8px 16px !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2) !important;
+        transition: all 0.25s ease !important;
+
+        &:hover {
+            background: #2e5a8a !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
+        }
+
+        &:active {
+            transform: translateY(0) !important;
+        }
+    }
+}
+
+.risk-disclaimer-modal {
+    &__content {
+        padding: 24px;
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #d1d5db;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+    }
+
+    &__title {
+        margin-bottom: 16px;
+        text-align: left;
+        color: #0f172a;
+        font-weight: 700;
+        font-size: 1.05rem;
+    }
+
+    &__text {
+        line-height: 1.7;
+        margin-bottom: 12px;
+        color: #334155;
+    }
+
+    &__list {
+        padding-left: 18px;
+        margin: 0 0 14px;
+        color: #334155;
+
+        li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+    }
+
+    &__note {
+        margin-top: 0;
+        margin-bottom: 18px;
+        line-height: 1.6;
+        color: #475569;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+    }
+
+    &__dont-show-btn,
+    &__close-btn {
+        min-width: 120px;
+        padding: 10px 18px !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        border: none !important;
+    }
+
+    &__dont-show-btn {
+        background: #e11d48 !important;
+        color: #ffffff !important;
+
+        &:hover {
+            background: #be123c !important;
+        }
+    }
+
+    &__close-btn {
+        background: #16a34a !important;
+        color: #ffffff !important;
+
+        &:hover {
+            background: #15803d !important;
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    .risk-disclaimer-button {
+        bottom: 90px;
+        left: 16px;
+
+        &__btn {
+            font-size: 11px !important;
+            padding: 6px 12px !important;
+        }
+    }
+
+    .risk-disclaimer-modal {
+        &__content {
+            padding: 18px;
+        }
+
+        &__title {
+            font-size: 1rem;
+        }
+
+        &__text,
+        &__note,
+        &__list li {
+            font-size: 13px;
+        }
+
+        &__dont-show-btn,
+        &__close-btn {
+            width: 100%;
+        }
+    }
+}
+
+@keyframes slide-in-left {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+// Mobile optimizations
+@media (max-width: 768px) {
+    .risk-disclaimer-button {
+        bottom: 100px; // Account for mobile navigation and scrolling
+        left: 16px;
+        z-index: 1001; // Ensure it stays above content
+
+        &__btn {
+            font-size: 11px !important;
+            padding: 6px 12px !important;
+        }
+    }
+
+    .risk-disclaimer-modal {
+        &__content {
+            padding: 20px;
+        }
+
+        &__title {
+            font-size: 16px;
+        }
+
+        &__text {
+            font-size: 13px;
+        }
+
+        &__understand-btn {
+            padding: 10px 24px !important;
+            font-size: 13px !important;
+        }
+    }
+}
+
+// Animation for floating button
+@keyframes slide-in-left {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}

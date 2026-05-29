@@ -1,0 +1,125 @@
+import Cookies from 'js-cookie';
+import { getAppId, getClientId, getRedirectUri } from '@/components/shared/utils/config/config';
+import { clearPKCEVerifier, popPKCEVerifier, validatePKCEState } from '@/utils/pkce';
+
+export async function startLogin(): Promise<void> {
+    const { generateOAuthURL } = await import('@/components/shared/utils/config/config');
+    const url = await generateOAuthURL();
+    window.location.href = url;
+}
+
+export async function startSignup(): Promise<void> {
+    const { generateOAuthURL } = await import('@/components/shared/utils/config/config');
+    const url = await generateOAuthURL('registration');
+    window.location.href = url;
+}
+
+export async function handleCallback(): Promise<{ success: boolean; error?: string }> {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+
+    if (error) {
+        return { success: false, error: errorDescription || error };
+    }
+
+    if (!code || !state) {
+        return { success: false, error: 'Missing code or state parameter' };
+    }
+
+    if (!validatePKCEState(state)) {
+        return { success: false, error: 'State mismatch' };
+    }
+
+    const codeVerifier = popPKCEVerifier();
+    if (!codeVerifier) {
+        return { success: false, error: 'Code verifier not found' };
+    }
+
+    try {
+        const redirect_uri = getRedirectUri();
+        // Use our server-side exchange endpoint to avoid CORS issues and to allow the server to set HTTP-only cookies
+        const response = await fetch('/api/auth/exchange-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                code,
+                code_verifier: codeVerifier,
+                redirect_uri,
+            }).toString(),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                error: errorData.error_description || errorData.error || 'Token exchange failed',
+            };
+        }
+
+        const tokenData = await response.json();
+        const access_token = tokenData.access_token || tokenData.accessToken;
+        const refresh_token = tokenData.refresh_token || tokenData.refreshToken;
+
+        if (!access_token) {
+            return { success: false, error: 'Access token was not returned' };
+        }
+
+        localStorage.setItem('authToken', access_token);
+        if (refresh_token) {
+            localStorage.setItem('refreshToken', refresh_token);
+        }
+
+        try {
+            const accountsResponse = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${access_token}`,
+                    'Deriv-App-ID': getAppId(),
+                },
+            });
+
+            if (accountsResponse.ok) {
+                const accountsData = await accountsResponse.json();
+                const accountsList: Record<string, string> = {};
+                const clientAccounts: Record<string, { loginid: string; token: string; currency: string }> = {};
+
+                if (Array.isArray(accountsData?.data)) {
+                    accountsData.data.forEach((account: { account_id: string; currency?: string }) => {
+                        if (account.account_id) {
+                            accountsList[account.account_id] = access_token;
+                            clientAccounts[account.account_id] = {
+                                loginid: account.account_id,
+                                token: access_token,
+                                currency: account.currency || '',
+                            };
+                        }
+                    });
+                }
+
+                if (Object.keys(accountsList).length > 0) {
+                    localStorage.setItem('accountsList', JSON.stringify(accountsList));
+                    localStorage.setItem('clientAccounts', JSON.stringify(clientAccounts));
+                    const firstAccountId = Object.keys(accountsList)[0];
+                    if (firstAccountId) {
+                        localStorage.setItem('active_loginid', firstAccountId);
+                    }
+                }
+            }
+        } catch (accountsError) {
+            console.error('Failed to fetch Deriv accounts after token exchange:', accountsError);
+        }
+
+        Cookies.set('logged_state', 'true', { path: '/' });
+        clearPKCEVerifier();
+
+        return { success: true };
+    } catch (err) {
+        console.error('Error exchanging token:', err);
+        return { success: false, error: 'Network error during token exchange' };
+    }
+}

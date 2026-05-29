@@ -1,0 +1,315 @@
+.free-bots {
+    width: 100%;
+    height: 100vh;
+    padding: 20px 20px 100px 20px; // Added bottom padding for scrolling
+    background: var(--general-main-1);
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch; // Smooth scrolling on iOS
+    scroll-behavior: smooth; // Smooth scrolling behavior
+
+    &__container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 60px; // Extra bottom padding
+    }
+
+    &__loading {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+        padding-bottom: 60px;
+        margin-bottom: 40px;
+        align-items: start;
+
+        @media (max-width: 1024px) {
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        @media (max-width: 768px) {
+            grid-template-columns: 1fr;
+            gap: 16px;
+            padding: 0 10px 80px 10px;
+            margin-bottom: 60px;
+        }
+    }
+
+    &__loading,
+    &__empty {
+        text-align: center;
+        padding: 60px 20px 100px 20px; // Added bottom padding
+        margin-bottom: 40px;
+    }
+}
+
+.free-bot-card {
+    background: var(--general-main-1);
+    border: 1px solid var(--border-normal);
+    border-radius: 12px;
+    padding: 14px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    animation: fade-in-up 0.6s ease-out;
+    animation-fill-mode: both;
+
+    &:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+    &:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    &:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+    &:nth-child(4) {
+        animation-delay: 0.4s;
+    }
+    &:nth-child(5) {
+        animation-delay: 0.5s;
+    }
+    &:nth-child(6) {
+        animation-delay: 0.6s;
+    }
+    &:nth-child(7) {
+        animation-delay: 0.7s;
+    }
+    &:nth-child(8) {
+        animation-delay: 0.8s;
+    }
+
+    height: auto;
+    min-height: auto;
+    max-height: none;
+    overflow: hidden;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        border-color: var(--brand-secondary);
+    }
+
+    &__header {
+        margin-bottom: 0;
+    }
+
+    &__title {
+        margin-bottom: 0;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__badges {
+        display: none;
+    }
+
+    &__badge {
+        display: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        &--beginner {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        &--intermediate {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        &--advanced {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        &--strategy {
+            background: var(--general-section-1);
+            color: var(--text-general);
+        }
+    }
+
+    &__description {
+        margin-bottom: 0;
+        line-height: 1.45;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__features {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 0;
+    }
+
+    &__feature {
+        padding: 2px 6px;
+        background: var(--general-section-1);
+        border-radius: 3px;
+        font-size: 10px;
+        color: var(--text-less-prominent);
+        border: 1px solid var(--border-normal);
+    }
+
+    &__load-btn {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        background: var(--brand-primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+        margin: 0;
+
+        &:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: rgba(22, 34, 58, 0.9) !important;
+            color: #ffffff !important;
+        }
+
+        &:disabled {
+            background: #ccc !important;
+            color: #666 !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
+    }
+
+    // Skeleton loading animation for cards without XML
+    &.loading {
+        .free-bot-card__title,
+        .free-bot-card__description {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border-radius: 4px;
+            color: transparent;
+        }
+    }
+}
+
+// Dark theme adjustments
+[data-theme='dark'] {
+    .free-bots {
+        background: var(--general-main-2);
+    }
+
+    .free-bot-card {
+        background: var(--general-main-2);
+        border-color: var(--border-normal);
+
+        &:hover {
+            border-color: var(--brand-secondary);
+        }
+
+        &__badge {
+            &--beginner {
+                background: rgba(46, 125, 50, 0.2);
+                color: #81c784;
+            }
+
+            &--intermediate {
+                background: rgba(245, 124, 0, 0.2);
+                color: #ffb74d;
+            }
+
+            &--advanced {
+                background: rgba(211, 47, 47, 0.2);
+                color: #e57373;
+            }
+        }
+    }
+}
+
+// Mobile optimizations
+@media (max-width: 768px) {
+    .free-bots {
+        padding: 16px 12px 120px 12px; // Increased bottom padding for mobile scrolling
+        height: calc(100vh - 60px); // Account for mobile navigation
+
+        &__container {
+            padding-bottom: 80px; // Extra bottom padding for mobile
+        }
+
+        &__grid {
+            gap: 16px;
+            padding-bottom: 100px; // Increased bottom padding
+            margin-bottom: 80px; // Added margin for better scrolling
+        }
+
+        &__loading,
+        &__empty {
+            padding: 40px 16px 120px 16px; // Increased bottom padding
+            margin-bottom: 60px;
+        }
+    }
+
+    .free-bot-card {
+        padding: 14px 14px 10px;
+        min-height: auto;
+        margin-bottom: 0;
+
+        &__title {
+            font-size: 14px;
+        }
+
+        &__description {
+            font-size: 12px;
+        }
+
+        &__feature {
+            font-size: 9px;
+            padding: 2px 4px;
+        }
+
+        &__load-btn {
+            padding: 8px;
+            font-size: 13px;
+            margin-top: 0;
+        }
+    }
+}
+
+// Animation for cards
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+// Skeleton loading animation
+@keyframes skeleton-loading {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
