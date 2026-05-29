@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
         console.log('🔑 [Backend] Deriv token exchange request:', {
-            client_id,
+            client_id: OAUTH_CLIENT_ID,
             code: code.substring(0, 20) + '...',
             redirect_uri,
             code_verifier: code_verifier.substring(0, 20) + '...',
