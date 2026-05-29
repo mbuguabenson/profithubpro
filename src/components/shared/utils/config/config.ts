@@ -5,14 +5,14 @@ export const DERIV_NEW_AUTH_URL = 'https://auth.deriv.com/oauth2/auth';
 export const DERIV_NEW_TOKEN_URL = 'https://auth.deriv.com/oauth2/token';
 
 export const APP_IDS = {
-    LOCALHOST: 29934,
+    LOCALHOST: 36300,
     TMP_STAGING: 64584,
     STAGING: 29934,
     STAGING_BE: 29934,
     STAGING_ME: 29934,
-    PRODUCTION: 133446,
-    PRODUCTION_BE: 133446,
-    PRODUCTION_ME: 133446,
+    PRODUCTION: 113536,
+    PRODUCTION_BE: 113536,
+    PRODUCTION_ME: 113536,
 };
 
 export const livechat_license_id = 12049137;
@@ -153,6 +153,8 @@ export const generateOAuthURL = async (prompt?: string) => {
     const code_challenge = await createCodeChallenge(code_verifier);
     const state = createState();
     storePKCEState(code_verifier, state);
+
+    console.log('🔐 OAuth URL Parameters:', { client_id, redirect_uri, scope: 'trade+account_manage' });
 
     let oauthUrl = `${DERIV_NEW_AUTH_URL}?response_type=code`;
     oauthUrl += `&client_id=${encodeURIComponent(client_id)}`;

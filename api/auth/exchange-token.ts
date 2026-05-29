@@ -51,6 +51,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
+        console.log('🔑 [Backend] Deriv token exchange request:', {
+            client_id,
+            code: code.substring(0, 20) + '...',
+            redirect_uri,
+            code_verifier: code_verifier.substring(0, 20) + '...',
+        });
         const tokenResponse = await fetch('https://auth.deriv.com/oauth2/token', {
             method: 'POST',
             headers: {
