@@ -36,6 +36,8 @@ export default defineConfig({
                 APP_ENV: JSON.stringify(process.env.APP_ENV),
                 REF_NAME: JSON.stringify(process.env.REF_NAME),
                 REMOTE_CONFIG_URL: JSON.stringify(process.env.REMOTE_CONFIG_URL),
+                OAUTH_CLIENT_ID: JSON.stringify(process.env.OAUTH_CLIENT_ID),
+                REDIRECT_URI: JSON.stringify(process.env.REDIRECT_URI),
                 GD_CLIENT_ID: JSON.stringify(process.env.GD_CLIENT_ID),
                 GD_APP_ID: JSON.stringify(process.env.GD_APP_ID),
                 GD_API_KEY: JSON.stringify(process.env.GD_API_KEY),
