@@ -95,7 +95,7 @@ const CopyTrading = observer(() => {
 
         setConnectionStatus('connecting');
 
-        const APP_ID = String(getAppId?.() ?? localStorage.getItem('APP_ID') ?? '29934');
+        const APP_ID = String(getAppId?.() ?? localStorage.getItem('APP_ID') ?? '113536');
         const server = getSocketURL?.() || 'ws.derivws.com';
         const wsUrl = `wss://${server}/websockets/v3?app_id=${APP_ID}`;
 
