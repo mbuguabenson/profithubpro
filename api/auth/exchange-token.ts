@@ -73,9 +73,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (!tokenResponse.ok) {
-            const errorData = await tokenResponse.text();
-            console.error('Token exchange failed:', errorData);
-            return res.status(400).json({ error: 'Token exchange failed' });
+            const errorText = await tokenResponse.text();
+            let errorData: any = null;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch {
+                errorData = null;
+            }
+
+            console.error('Token exchange failed:', {
+                status: tokenResponse.status,
+                body: errorData ?? errorText,
+            });
+
+            return res.status(400).json({
+                error: errorData?.error || 'Token exchange failed',
+                error_description: errorData?.error_description || errorData?.message || errorText,
+            });
         }
 
         const tokenData = await tokenResponse.json();
