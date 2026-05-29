@@ -2,8 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
-// Base redirect/origin for the app (may be set to e.g. https://profithubpro.vercel.app)
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app';
+// Base redirect/origin for the app (must match Deriv's registered redirect_uri exactly)
+const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const incoming_path = incoming.pathname.replace(/\/$/, '') || '/';
         const is_incoming_localhost = incoming.hostname === 'localhost' || incoming.hostname === '127.0.0.1';
         const base_origin_matches = incoming.origin === base.origin || is_incoming_localhost;
-        const allowed_paths = ['/', '/callback'];
+        const allowed_paths = ['/'];
 
         if (!base_origin_matches || !allowed_paths.includes(incoming_path)) {
             console.warn('Rejecting unexpected redirect_uri', { redirect_uri, allowed_origin: base.origin, incoming_origin: incoming.origin, incoming_path });

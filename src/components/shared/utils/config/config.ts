@@ -143,7 +143,7 @@ export const getRedirectUri = () => {
     if (isLocal()) {
         return `${window.location.origin}/callback`;
     }
-    return process.env.REDIRECT_URI || `${window.location.origin}/callback`;
+    return process.env.REDIRECT_URI || `${window.location.origin}/`;
 };
 
 export const generateOAuthURL = async (prompt?: string) => {
