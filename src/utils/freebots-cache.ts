@@ -104,6 +104,9 @@ export const prefetchAllXmlInBackground = async (files: string[]) => {
     }
 };
 
+const isJsonResponse = (res: Response) =>
+    res.headers.get('content-type')?.toLowerCase().includes('application/json');
+
 export const getBotsManifest = async (): Promise<TBotsManifestItem[] | null> => {
     try {
         const hostname = window.location.hostname.toLowerCase();
@@ -116,18 +119,33 @@ export const getBotsManifest = async (): Promise<TBotsManifestItem[] | null> => 
             hostname
         ).replace(/^www\./, '');
 
-        // Try domain-specific manifest first
-        let res = await fetch(`/xml/${encodeURIComponent(domain)}/bots.json`, { cache: 'force-cache' });
-        if (!res.ok) {
-            // Fallback to generic manifest
-            res = await fetch('/xml/bots.json', { cache: 'force-cache' });
+        const manifestPaths = [
+            `/xml/${encodeURIComponent(domain)}/bots.json`,
+            '/xml/bots.json',
+        ];
+
+        let res: Response | null = null;
+        let loadedPath = '';
+
+        for (const path of manifestPaths) {
+            try {
+                const candidate = await fetch(path, { cache: 'no-cache' });
+                if (!candidate.ok) continue;
+                if (!isJsonResponse(candidate)) continue;
+
+                res = candidate;
+                loadedPath = path;
+                break;
+            } catch (_) {
+                continue;
+            }
         }
-        if (!res.ok) return null;
+
+        if (!res) return null;
 
         const data = (await res.json()) as TBotsManifestItem[];
 
-        // If we loaded a domain-specific file, set base for XML fetches
-        if (res.url.includes(`/${domain}/bots.json`)) {
+        if (loadedPath.includes(`/${domain}/bots.json`)) {
             setXmlBase(`/xml/${domain}/`);
         } else {
             setXmlBase('/xml/');

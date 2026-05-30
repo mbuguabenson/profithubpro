@@ -22,6 +22,9 @@ export const domain_app_ids = {
     'binaryhat.site': 113536,
 };
 
+const LEGACY_APP_ID_STORAGE_KEY = 'config.legacy_app_id';
+const LEGACY_MODE_STORAGE_KEY = 'config.enable_legacy_mode';
+
 export const normalizeDomain = (hostname: string) =>
     hostname
         ?.toLowerCase()
@@ -48,6 +51,17 @@ export const isTestLink = () => {
 };
 
 export const isLocal = () => /localhost(:\d+)?$/i.test(window.location.hostname);
+
+export const getLegacyAppId = (): number | null => {
+    const storedLegacy = window.localStorage.getItem(LEGACY_APP_ID_STORAGE_KEY);
+    if (!storedLegacy) return null;
+    return /^[0-9]+$/.test(storedLegacy) ? Number(storedLegacy) : null;
+};
+
+export const isLegacyModeEnabled = (): boolean => {
+    const storedLegacyMode = window.localStorage.getItem(LEGACY_MODE_STORAGE_KEY);
+    return storedLegacyMode === '1' || storedLegacyMode === 'true';
+};
 
 const getDefaultServerURL = () => {
     const server = 'ws';
@@ -170,6 +184,12 @@ export const generateOAuthURL = async (prompt?: string) => {
         code_challenge,
         code_challenge_method: 'S256',
     });
+
+    const legacyAppId = getLegacyAppId();
+    if (legacyAppId) {
+        params.set('app_id', legacyAppId.toString());
+        console.log('🔐 [Frontend] Appending legacy app_id to OAuth URL:', legacyAppId);
+    }
 
     if (prompt) {
         params.set('prompt', prompt);

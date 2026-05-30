@@ -15,20 +15,26 @@ const getManifestURL = () => {
 
 const MANIFEST_URL = getManifestURL();
 
+const isJsonResponse = response =>
+    response?.ok && response.headers.get('content-type')?.toLowerCase().includes('application/json');
+
 self.addEventListener('install', event => {
     self.skipWaiting();
     event.waitUntil(
         (async () => {
             const cache = await caches.open(CACHE_NAME);
-            // Pre-cache the manifest first
+            // Pre-cache the manifest first only if it is a valid JSON response
             try {
-                await cache.add(new Request(MANIFEST_URL, { cache: 'no-cache' }));
+                const manifestResponse = await fetch(new Request(MANIFEST_URL), { cache: 'no-cache' });
+                if (isJsonResponse(manifestResponse)) {
+                    await cache.put(new Request(MANIFEST_URL), manifestResponse.clone());
+                }
             } catch (_) {}
 
             // Try to fetch manifest and pre-cache XMLs
             try {
                 const res = await fetch(MANIFEST_URL, { cache: 'no-cache' });
-                if (res.ok) {
+                if (isJsonResponse(res)) {
                     const items = await res.json();
                     const files = Array.isArray(items) ? items.map(i => `/xml/${encodeURIComponent(i.file)}`) : [];
                     // Batch cache XML files to avoid long install stalls
@@ -80,18 +86,22 @@ self.addEventListener('fetch', event => {
             const cache = await caches.open(CACHE_NAME);
             const cached = await cache.match(request);
             if (cached) {
-                // Update cache in background
-                event.waitUntil(
-                    (async () => {
-                        try {
-                            const fresh = await fetch(request, { cache: 'no-cache' });
-                            if (fresh && fresh.ok) await cache.put(request, fresh.clone());
-                        } catch (_) {}
-                    })()
-                );
-                return cached;
+                if (isManifest && !isJsonResponse(cached)) {
+                    // Ignore invalid cached manifest and refresh from network
+                } else {
+                    // Update cache in background
+                    event.waitUntil(
+                        (async () => {
+                            try {
+                                const fresh = await fetch(request, { cache: 'no-cache' });
+                                if (fresh && fresh.ok) await cache.put(request, fresh.clone());
+                            } catch (_) {}
+                        })()
+                    );
+                    return cached;
+                }
             }
-            // No cache -> fetch and cache
+            // No cache or invalid cached manifest -> fetch and cache
             try {
                 const resp = await fetch(request, { cache: 'no-cache' });
                 if (resp && resp.ok) await cache.put(request, resp.clone());

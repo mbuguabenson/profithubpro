@@ -73,19 +73,45 @@ const Layout = () => {
                 return false;
             });
 
+            const masterToken = localStorage.getItem('authToken') || '';
+            const isNewOAuth = masterToken.startsWith('ory_at_');
+
             let hasMissingToken = false;
             let missingTokenCurrency = '';
+            const updatedAccountsList = { ...accountsList };
+            const updatedClientAccounts = { ...checkClientAccount };
+            let needUpdateStorage = false;
 
             for (const acc of account_list_filter) {
-                if (acc.loginid && !accountsList[acc.loginid]) {
-                    hasMissingToken = true;
-                    missingTokenCurrency = acc.currency || '';
-                    // Store the missing token's currency in session storage
-                    if (missingTokenCurrency) {
-                        sessionStorage.setItem('query_param_currency', missingTokenCurrency);
+                if (acc.loginid) {
+                    if (!accountsList[acc.loginid]) {
+                        if (isNewOAuth) {
+                            console.log(`🔑 [Layout] Propagating master OAuth token to account ${acc.loginid}`);
+                            updatedAccountsList[acc.loginid] = masterToken;
+                            updatedClientAccounts[acc.loginid] = {
+                                loginid: acc.loginid,
+                                token: masterToken,
+                                currency: acc.currency || '',
+                            };
+                            needUpdateStorage = true;
+                        } else {
+                            hasMissingToken = true;
+                            missingTokenCurrency = acc.currency || '';
+                            // Store the missing token's currency in session storage
+                            if (missingTokenCurrency) {
+                                sessionStorage.setItem('query_param_currency', missingTokenCurrency);
+                            }
+                            break;
+                        }
                     }
-                    break;
                 }
+            }
+
+            if (needUpdateStorage) {
+                localStorage.setItem('accountsList', JSON.stringify(updatedAccountsList));
+                localStorage.setItem('clientAccounts', JSON.stringify(updatedClientAccounts));
+                Object.assign(accountsList, updatedAccountsList);
+                Object.assign(checkClientAccount, updatedClientAccounts);
             }
 
             if (hasMissingCurrency || hasMissingToken) {
