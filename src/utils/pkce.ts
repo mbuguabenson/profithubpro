@@ -5,10 +5,13 @@
 export function generateRandomString(length: number): string {
     const array = new Uint8Array(length);
     crypto.getRandomValues(array);
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    // Use base64url encoding for higher entropy per character (PKCE spec compliant charset)
+    const base64 = btoa(String.fromCharCode(...array));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 export function createCodeVerifier(): string {
+    // 32 random bytes → ~43 base64url chars (meets PKCE 43-128 char requirement)
     return generateRandomString(32);
 }
 

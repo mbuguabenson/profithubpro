@@ -161,17 +161,21 @@ export const generateOAuthURL = async (prompt?: string) => {
         redirect_uri 
     });
 
-    let oauthUrl = `${DERIV_NEW_AUTH_URL}?response_type=code`;
-    oauthUrl += `&client_id=${encodeURIComponent(client_id)}`;
-    oauthUrl += `&redirect_uri=${encodeURIComponent(redirect_uri)}`;
-    oauthUrl += `&scope=trade+account_manage`;
-    oauthUrl += `&state=${encodeURIComponent(state)}`;
-    oauthUrl += `&code_challenge=${encodeURIComponent(code_challenge)}`;
-    oauthUrl += `&code_challenge_method=S256`;
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id,
+        redirect_uri,
+        scope: 'read trade payments admin',
+        state,
+        code_challenge,
+        code_challenge_method: 'S256',
+    });
 
     if (prompt) {
-        oauthUrl += `&prompt=${encodeURIComponent(prompt)}`;
+        params.set('prompt', prompt);
     }
+
+    const oauthUrl = `${DERIV_NEW_AUTH_URL}?${params.toString()}`;
 
     console.log('🔐 [Frontend] Full OAuth URL:', oauthUrl.substring(0, 100) + '...');
 

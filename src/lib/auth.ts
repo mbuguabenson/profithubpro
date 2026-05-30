@@ -1,5 +1,5 @@
 import Cookies from 'js-cookie';
-import { getAppId, getClientId, getRedirectUri } from '@/components/shared/utils/config/config';
+import { getAppId, getRedirectUri } from '@/components/shared/utils/config/config';
 import { clearPKCEVerifier, popPKCEVerifier, validatePKCEState } from '@/utils/pkce';
 
 export async function startLogin(): Promise<void> {
@@ -100,7 +100,7 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
                 method: 'GET',
                 headers: {
                     Authorization: `Bearer ${access_token}`,
-                    'Deriv-App-ID': getAppId(),
+                    'Deriv-App-ID': String(getAppId()),
                 },
             });
 
