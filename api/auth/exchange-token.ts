@@ -94,11 +94,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.error('Token exchange failed:', {
                 status: tokenResponse.status,
                 body: errorData ?? errorText,
+                sent_params: {
+                    client_id: OAUTH_CLIENT_ID,
+                    redirect_uri,
+                    code: code.substring(0, 10) + '...',
+                    code_verifier: code_verifier.substring(0, 10) + '...'
+                }
             });
 
             return res.status(400).json({
-                error: errorData?.error || 'Token exchange failed',
-                error_description: errorData?.error_description || errorData?.message || errorText,
+                error: 'Token exchange failed',
+                error_description: errorData?.error_description || errorData?.message || errorText || `HTTP Status ${tokenResponse.status}`,
+                deriv_response: errorData ?? errorText,
+                debug_info: {
+                    client_id: OAUTH_CLIENT_ID,
+                    redirect_uri,
+                }
             });
         }
 
