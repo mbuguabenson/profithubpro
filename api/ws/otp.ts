@@ -1,7 +1,7 @@
 import { parse } from 'cookie';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-const LEGACY_APP_ID = process.env.LEGACY_APP_ID || '126595';
+const LEGACY_APP_ID = process.env.LEGACY_APP_ID || '113536';
 
 function getAccessTokenFromRequest(req: NextApiRequest): string | null {
     const authorization = req.headers.authorization;

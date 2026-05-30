@@ -13,7 +13,7 @@
 2. Generate session secret
 3. Set 4 environment variables in Vercel
 4. Git push → Deploy
-5. Test at: `https://extradollarhub.site/auth`
+5. Test at: `https://profithubpro.vercel.app/auth`
 
 ### Path 2: Understand It First (30 minutes)
 1. Read: **IMPLEMENTATION_SUMMARY.md** (overview)
@@ -312,9 +312,9 @@ package.json
 
 | Variable | Value | Generation |
 |----------|-------|-----------|
-| `OAUTH_CLIENT_ID` | `32LTHOWJyXh0f3E6uTNFP` | Provided |
-| `LEGACY_APP_ID` | `126595` | Provided |
-| `REDIRECT_URI` | `https://extradollarhub.site` | Provided |
+| `OAUTH_CLIENT_ID` | `33pC7qk8i9WtRbTbSOkcq` | Provided |
+| `LEGACY_APP_ID` | `113536` | Provided |
+| `REDIRECT_URI` | `https://profithubpro.vercel.app/callback` | Provided |
 | `SESSION_SECRET` | (random string) | `openssl rand -base64 32` |
 
 ---
@@ -338,7 +338,7 @@ Before deploying, verify:
 - [ ] All documentation read (at least QUICKSTART.md)
 - [ ] SESSION_SECRET generated (`openssl rand -base64 32`)
 - [ ] Environment variables prepared
-- [ ] OAuth app redirect URI already set (https://extradollarhub.site)
+- [ ] OAuth app redirect URI already set (https://profithubpro.vercel.app/callback)
 - [ ] Vercel project access available
 - [ ] Git repository ready to push
 
