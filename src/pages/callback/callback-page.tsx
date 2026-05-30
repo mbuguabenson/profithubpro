@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@deriv-com/ui';
 import { handleCallback } from '@/lib/auth';
 
 const CallbackPage: React.FC = () => {
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState<string>('Processing authentication...');
+    const hasProcessed = useRef(false);
 
     useEffect(() => {
+        if (hasProcessed.current) return;
+        hasProcessed.current = true;
+
         const processCallback = async () => {
             const result = await handleCallback();
             if (result.success) {
