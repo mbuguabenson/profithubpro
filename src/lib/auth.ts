@@ -96,6 +96,10 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
         }
 
         try {
+            console.log('📡 [Frontend] Fetching Deriv accounts using token...', {
+                appId: String(getAppId()),
+                token_preview: access_token.substring(0, 15) + '...'
+            });
             const accountsResponse = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
                 method: 'GET',
                 headers: {
@@ -104,8 +108,11 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
                 },
             });
 
+            console.log('📡 [Frontend] Accounts response status:', accountsResponse.status);
+
             if (accountsResponse.ok) {
                 const accountsData = await accountsResponse.json();
+                console.log('📡 [Frontend] Accounts data received:', accountsData);
                 const accountsList: Record<string, string> = {};
                 const clientAccounts: Record<string, { loginid: string; token: string; currency: string }> = {};
 
@@ -120,7 +127,14 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
                             };
                         }
                     });
+                } else {
+                    console.warn('⚠️ [Frontend] accountsData.data is not an array:', accountsData?.data);
                 }
+
+                console.log('📡 [Frontend] Processed accounts:', {
+                    accountsListKeys: Object.keys(accountsList),
+                    clientAccountsKeys: Object.keys(clientAccounts)
+                });
 
                 if (Object.keys(accountsList).length > 0) {
                     localStorage.setItem('accountsList', JSON.stringify(accountsList));
@@ -129,10 +143,16 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
                     if (firstAccountId) {
                         localStorage.setItem('active_loginid', firstAccountId);
                     }
+                    console.log('✅ [Frontend] Saved accounts and active login ID to localStorage');
+                } else {
+                    console.error('❌ [Frontend] No accounts found to save in localStorage');
                 }
+            } else {
+                const errText = await accountsResponse.text();
+                console.error('❌ [Frontend] Accounts fetch failed with status:', accountsResponse.status, 'body:', errText);
             }
         } catch (accountsError) {
-            console.error('Failed to fetch Deriv accounts after token exchange:', accountsError);
+            console.error('❌ [Frontend] Failed to fetch Deriv accounts after token exchange:', accountsError);
         }
 
         Cookies.set('logged_state', 'true', { path: '/' });
