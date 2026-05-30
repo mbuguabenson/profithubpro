@@ -165,7 +165,7 @@ export const generateOAuthURL = async (prompt?: string) => {
         response_type: 'code',
         client_id,
         redirect_uri,
-        scope: 'read trade payments admin',
+        scope: 'trade',
         state,
         code_challenge,
         code_challenge_method: 'S256',
