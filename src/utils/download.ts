@@ -26,7 +26,7 @@ export type TLogTypes = Readonly<{
 }>;
 
 export type TExtra = {
-    profit?: string;
+    profit?: string | number;
     sold_for?: string;
     longcode?: string;
     transaction_id?: string;

@@ -34,20 +34,22 @@ const Download = observer(({ tab }: TDownloadProps) => {
                 localize('Profit/Loss'),
             ],
         ];
-        transaction_list.forEach(({ data }: { data: TTransaction }) => {
-            if (typeof data === 'string') return;
+        transaction_list.forEach((item) => {
+            const data = item.data;
+            if (!data || typeof data === 'string') return;
+            const txData = data as unknown as TTransaction;
             items.push([
-                data.display_name,
-                data.transaction_ids.buy,
-                data.transaction_ids.sell,
-                data.barrier,
-                data.date_start,
-                data.entry_tick,
-                data.entry_tick_time,
-                data.exit_tick,
-                data.exit_tick_time,
-                data.buy_price,
-                data.profit,
+                txData.display_name ?? '',
+                txData.transaction_ids?.buy ?? '',
+                txData.transaction_ids?.sell ?? '',
+                txData.barrier ?? '',
+                txData.date_start ?? '',
+                txData.entry_tick ?? '',
+                txData.entry_tick_time ?? '',
+                txData.exit_tick ?? '',
+                txData.exit_tick_time ?? '',
+                txData.buy_price ?? '',
+                txData.profit ?? '',
             ]);
         });
 
@@ -58,14 +60,18 @@ const Download = observer(({ tab }: TDownloadProps) => {
     const downloadJournal = () => {
         const items = [[localize('Date'), localize('Time'), localize('Message')]];
 
-        filtered_messages.map(item => {
+        filtered_messages.forEach(item => {
             let array_message;
             if (item.message_type !== 'success') {
                 array_message = JSON.stringify(item.message);
             } else {
                 array_message = getSuccessJournalMessage(item.message.toString(), item.extra);
             }
-            const arr = [item.date, item.time, array_message?.replace('&#x2F;', '/')];
+            const arr = [
+                item.date ?? '',
+                item.time ?? '',
+                array_message?.replace('&#x2F;', '/') ?? '',
+            ];
             items.push(arr);
         });
         const content = items.map(e => e.join(',')).join('\n');
