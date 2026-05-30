@@ -178,6 +178,22 @@ const ProCirclesAnalysis = observer(() => {
                 ))}
             </div>
 
+            <div className='action-summary-panel glass-pod'>
+                <div className='summary-copy'>
+                    <span>PRO CIRCUITS</span>
+                    <h2>Signal intelligence with premium control</h2>
+                    <p>Monitor market frequency trends and execute strategy actions effortlessly from one polished dashboard.</p>
+                </div>
+                <div className='summary-actions'>
+                    <button className='action-pill primary' onClick={() => smart_auto.toggleBot(view_strategy, 'auto')}>
+                        Launch Auto
+                    </button>
+                    <button className='action-pill secondary' onClick={() => smart_auto.clearLogs()}>
+                        Clear Logs
+                    </button>
+                </div>
+            </div>
+
             {/* 2. COMMAND HEADER */}
             <div className='glass-pod command-header'>
                 <div className='h-group'>

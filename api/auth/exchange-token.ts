@@ -2,8 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
-// Base redirect/origin for the app (must match Deriv's registered redirect_uri exactly)
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/';
+// Canonical redirect URI must match the registered OAuth redirect exactly.
+const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
@@ -30,16 +30,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Invalid request' });
     }
 
-    // Allow the canonical REDIRECT_URI or same-origin callback path (e.g. <origin>/callback).
-    // This accepts a redirect_uri whose origin matches the configured REDIRECT_URI origin
-    // and whose path is either '/' or '/callback' (with or without trailing slash).
+    // Enforce the exact canonical redirect URI used for the OAuth flow.
+    // Only allow the configured redirect URI or a localhost callback during local testing.
     try {
         const incoming = new URL(redirect_uri);
         const base = new URL(REDIRECT_URI);
         const incoming_path = incoming.pathname.replace(/\/$/, '') || '/';
+        const base_path = base.pathname.replace(/\/$/, '') || '/callback';
         const is_incoming_localhost = incoming.hostname === 'localhost' || incoming.hostname === '127.0.0.1';
         const base_origin_matches = incoming.origin === base.origin || is_incoming_localhost;
-        const allowed_paths = ['/'];
+        const allowed_paths = [base_path];
 
         if (!base_origin_matches || !allowed_paths.includes(incoming_path)) {
             console.warn('Rejecting unexpected redirect_uri', { redirect_uri, allowed_origin: base.origin, incoming_origin: incoming.origin, incoming_path });

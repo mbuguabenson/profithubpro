@@ -15,6 +15,12 @@ const ProDigitCracker = observer(() => {
     const { digit_cracker, client } = useStore();
     const [activeStrategy, setActiveStrategy] = useState<'even_odd' | 'differs' | 'matches' | 'over_under'>('even_odd');
     const [activeLogTab, setActiveLogTab] = useState<'journal' | 'summary'>('journal');
+    const [widgetOpen, setWidgetOpen] = useState(true);
+    const [widgetPosition, setWidgetPosition] = useState({ x: 32, y: 140 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [scanMode, setScanMode] = useState<'pattern' | 'risk' | 'strategy'>('pattern');
+    const [marketScanEnabled, setMarketScanEnabled] = useState(true);
+    const widgetDragRef = useRef<{ x: number; y: number } | null>(null);
     const logRef = useRef<HTMLDivElement>(null);
 
     const { symbol, digit_stats, is_connected, total_ticks, setTotalTicks, markets, trade_engine, last_digit } =
@@ -37,6 +43,38 @@ const ProDigitCracker = observer(() => {
             logRef.current.scrollTop = logRef.current.scrollHeight;
         }
     }, [logs.length]);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMove = (event: MouseEvent) => {
+            if (!widgetDragRef.current) return;
+            const nextX = event.clientX - widgetDragRef.current.x;
+            const nextY = event.clientY - widgetDragRef.current.y;
+            setWidgetPosition({
+                x: Math.max(16, Math.min(window.innerWidth - 360, nextX)),
+                y: Math.max(16, Math.min(window.innerHeight - 220, nextY)),
+            });
+        };
+
+        const handleEnd = () => setIsDragging(false);
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleEnd);
+        };
+    }, [isDragging]);
+
+    const handleWidgetDragStart = (event: any) => {
+        widgetDragRef.current = {
+            x: event.clientX - widgetPosition.x,
+            y: event.clientY - widgetPosition.y,
+        };
+        setIsDragging(true);
+    };
 
     const handleMarketChange = (newSymbol: string) => {
         digit_cracker.setSymbol(newSymbol);
@@ -183,10 +221,63 @@ const ProDigitCracker = observer(() => {
         );
     };
 
+    const activeConfig = (trade_engine as any)[`${activeStrategy}_config` as keyof typeof trade_engine] as TTradeConfig;
     const availableMarkets = markets.length > 0 ? markets.flatMap(group => group.items) : [];
+
+    const scanConfidence = Math.round(
+        Math.min(
+            98,
+            activeStrategy === 'even_odd'
+                ? Math.max(digit_cracker.percentages.even, digit_cracker.percentages.odd)
+                : activeStrategy === 'over_under'
+                ? Math.max(digit_cracker.percentages.over, digit_cracker.percentages.under)
+                : activeStrategy === 'differs'
+                ? Math.max(...digit_stats.map(stat => stat.percentage))
+                : Math.max(digit_cracker.matches_ranks.most ?? 0, digit_cracker.matches_ranks.second ?? 0, digit_cracker.matches_ranks.least ?? 0)
+        ) + 12
+    );
+
+    const scanSignal = (() => {
+        if (!activeStrategy) return 'IDLE';
+        switch (activeStrategy) {
+            case 'even_odd':
+                return digit_cracker.percentages.even > digit_cracker.percentages.odd ? 'EVEN EDGE' : 'ODD EDGE';
+            case 'over_under':
+                return digit_cracker.percentages.over > digit_cracker.percentages.under ? 'OVER PRESSURE' : 'UNDER PRESSURE';
+            case 'differs':
+                return 'LOW PROBABILITY FAVOURITES';
+            case 'matches':
+                return `MATCH RANK ${digit_cracker.matches_ranks.most ?? '-'} / ${digit_cracker.matches_ranks.second ?? '-'} `;
+            default:
+                return 'ANALYZING';
+        }
+    })();
+
+    const widgetStatus = activeConfig?.is_running ? 'ACTIVE SCAN' : 'STANDBY';
 
     return (
         <div className='digit-cracker-page'>
+            <div className='engine-action-card glass-panel'>
+                <div className='engine-info'>
+                    <span>ENGINE CONTROL</span>
+                    <h2>{activeConfig?.is_running ? 'Trading Engine Active' : 'Ready to fire'}</h2>
+                </div>
+                <div className='engine-actions'>
+                    <button
+                        className={`btn-hero ${activeConfig?.is_running ? 'active' : ''}`}
+                        onClick={() => trade_engine.toggleStrategy(activeStrategy)}
+                    >
+                        {activeConfig?.is_running ? 'Stop Engine' : 'Start Engine'}
+                    </button>
+                    <button
+                        className='btn-hero secondary'
+                        onClick={() => trade_engine.executeManualTrade(activeStrategy, symbol, client.currency || 'USD')}
+                        disabled={is_executing}
+                    >
+                        Manual Strike
+                    </button>
+                </div>
+            </div>
             {/* Header Area */}
             <div className='cracker-header'>
                 <div className='header-main'>
@@ -362,6 +453,172 @@ const ProDigitCracker = observer(() => {
                         RESET PERFORMANCE
                     </button>
                 </div>
+            </div>
+
+            <div
+                className={`ai-scanner-widget glass-panel ${widgetOpen ? 'open' : 'closed'}`}
+                style={{ left: widgetPosition.x, top: widgetPosition.y }}
+            >
+                <div className='widget-handle'>
+                    <div className='widget-brand' onMouseDown={handleWidgetDragStart}>
+                        <span className='brand-mark'>AI</span>
+                        <div>
+                            <strong>Scanner</strong>
+                            <small>{widgetStatus}</small>
+                        </div>
+                    </div>
+                    <button className='widget-toggle' onClick={() => setWidgetOpen(prev => !prev)}>
+                        {widgetOpen ? 'Minimize' : 'Open'}
+                    </button>
+                </div>
+
+                {widgetOpen ? (
+                    <>
+                        <div className='widget-summary'>
+                            <div>
+                                <span>Signal</span>
+                                <strong>{scanSignal}</strong>
+                            </div>
+                            <div>
+                                <span>Confidence</span>
+                                <strong>{scanConfidence}%</strong>
+                            </div>
+                        </div>
+
+                        <div className='widget-stats'>
+                            <div className='stat-pill'>
+                                <span>Market Scan</span>
+                                <strong>{marketScanEnabled ? 'ON' : 'OFF'}</strong>
+                            </div>
+                            <div className='stat-pill'>
+                                <span>Last Digit</span>
+                                <strong>{last_digit ?? '-'}</strong>
+                            </div>
+                            <div className='stat-pill'>
+                                <span>Trend</span>
+                                <strong>{digit_cracker.ticks.slice(-15).join(', ') || 'WAITING'}</strong>
+                            </div>
+                        </div>
+
+                        <div className='widget-segmented'>
+                            {['pattern', 'strategy', 'risk'].map(mode => (
+                                <button
+                                    key={mode}
+                                    className={scanMode === mode ? 'active' : ''}
+                                    onClick={() => setScanMode(mode as any)}
+                                >
+                                    {mode.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className='widget-panel'>
+                            <div className='panel-row'>
+                                <label>Strategy</label>
+                                <div className='strategy-selector'>
+                                    {['even_odd', 'over_under', 'differs', 'matches'].map(strategy => (
+                                        <button
+                                            key={strategy}
+                                            className={activeStrategy === strategy ? 'active' : ''}
+                                            onClick={() => setActiveStrategy(strategy as any)}
+                                        >
+                                            {strategy.replace('_', ' ').toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className='panel-row'>
+                                <label>Stake</label>
+                                <input
+                                    type='number'
+                                    min='0.35'
+                                    step='0.05'
+                                    value={activeConfig?.stake ?? 0.35}
+                                    onChange={e => trade_engine.updateConfig(activeStrategy, 'stake', parseFloat(e.target.value) || 0.35)}
+                                />
+                            </div>
+
+                            <div className='panel-grid'>
+                                <div className='panel-row'>
+                                    <label>Take Profit</label>
+                                    <input
+                                        type='number'
+                                        min='0'
+                                        step='1'
+                                        value={activeConfig?.take_profit ?? 10}
+                                        onChange={e => trade_engine.updateConfig(activeStrategy, 'take_profit', parseFloat(e.target.value) || 0)}
+                                    />
+                                </div>
+                                <div className='panel-row'>
+                                    <label>Stop Loss</label>
+                                    <input
+                                        type='number'
+                                        min='0'
+                                        step='1'
+                                        value={activeConfig?.max_loss ?? 5}
+                                        onChange={e => trade_engine.updateConfig(activeStrategy, 'max_loss', parseFloat(e.target.value) || 0)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className='panel-row switch-row'>
+                                <label>Market Scan</label>
+                                <button className={marketScanEnabled ? 'pill active' : 'pill'} onClick={() => setMarketScanEnabled(prev => !prev)}>
+                                    {marketScanEnabled ? 'Enabled' : 'Disabled'}
+                                </button>
+                            </div>
+
+                            <div className='panel-row switch-row'>
+                                <label>Martingale</label>
+                                <button
+                                    className={activeConfig?.use_martingale ? 'pill active' : 'pill'}
+                                    onClick={() => trade_engine.updateConfig(activeStrategy, 'use_martingale', !activeConfig?.use_martingale)}
+                                >
+                                    {activeConfig?.use_martingale ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+
+                            <div className='panel-row'>
+                                <label>Prediction</label>
+                                <input
+                                    type='number'
+                                    min='0'
+                                    max='9'
+                                    value={activeConfig?.prediction ?? 0}
+                                    onChange={e => trade_engine.updateConfig(activeStrategy, 'prediction', parseInt(e.target.value) || 0)}
+                                />
+                            </div>
+
+                            <div className='panel-row'>
+                                <label>Scan Depth</label>
+                                <input
+                                    type='range'
+                                    min='100'
+                                    max='1000'
+                                    step='50'
+                                    value={total_ticks}
+                                    onChange={e => setTotalTicks(parseInt(e.target.value))}
+                                />
+                                <span className='range-value'>{total_ticks} ticks</span>
+                            </div>
+                        </div>
+
+                        <div className='widget-actions'>
+                            <button className='btn-primary' onClick={() => trade_engine.toggleStrategy(activeStrategy)}>
+                                {activeConfig?.is_running ? 'DEACTIVATE SCAN' : 'LAUNCH SCAN'}
+                            </button>
+                            <button className='btn-secondary' onClick={() => trade_engine.executeManualTrade(activeStrategy, symbol, client.currency || 'USD')} disabled={is_executing}>
+                                EXECUTE ENTRY
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className='widget-compact'>
+                        <span>{scanSignal}</span>
+                        <strong>{scanConfidence}%</strong>
+                    </div>
+                )}
             </div>
         </div>
     );

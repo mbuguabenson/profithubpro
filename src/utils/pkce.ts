@@ -30,7 +30,9 @@ export const storePKCEState = (verifier: string, state: string) => {
 };
 
 export const popPKCEVerifier = (): string | null => {
-    return sessionStorage.getItem('pkce_code_verifier');
+    const verifier = sessionStorage.getItem('pkce_code_verifier');
+    sessionStorage.removeItem('pkce_code_verifier');
+    return verifier;
 };
 
 export const clearPKCEVerifier = () => {

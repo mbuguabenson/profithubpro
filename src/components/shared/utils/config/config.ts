@@ -135,15 +135,15 @@ export const getDebugServiceWorker = () => {
     return false;
 };
 
+const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
+const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
+
 export const getClientId = () => {
-    return process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
+    return OAUTH_CLIENT_ID;
 };
 
 export const getRedirectUri = () => {
-    if (isLocal()) {
-        return `${window.location.origin}/callback`;
-    }
-    return process.env.REDIRECT_URI || `${window.location.origin}/`;
+    return REDIRECT_URI;
 };
 
 export const generateOAuthURL = async (prompt?: string) => {
@@ -163,11 +163,6 @@ export const generateOAuthURL = async (prompt?: string) => {
     oauthUrl += `&state=${encodeURIComponent(state)}`;
     oauthUrl += `&code_challenge=${encodeURIComponent(code_challenge)}`;
     oauthUrl += `&code_challenge_method=S256`;
-
-    const app_id = getAppId();
-    if (app_id) {
-        oauthUrl += `&app_id=${encodeURIComponent(app_id)}`;
-    }
 
     if (prompt) {
         oauthUrl += `&prompt=${encodeURIComponent(prompt)}`;

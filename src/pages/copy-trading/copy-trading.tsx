@@ -301,6 +301,51 @@ const CopyTrading = observer(() => {
                 </div>
             </div>
 
+            {/* Hero Summary */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1.8fr_1fr] gap-6 mb-8">
+                <div className="rounded-[32px] border border-cyan-500/10 bg-gradient-to-br from-slate-900/95 via-slate-950/90 to-slate-900/80 p-6 shadow-2xl shadow-cyan-500/10">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.26em] text-cyan-300/70 mb-2">
+                                Copy trading dashboard
+                            </p>
+                            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+                                Modern Trade Replication
+                            </h1>
+                            <p className="mt-3 max-w-2xl text-sm text-slate-400">
+                                Keep your tokens synced, monitor live status, and control your copy trading service from a clean, modern dashboard.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
+                            <div className="rounded-3xl bg-slate-950/70 border border-slate-800/90 p-4 text-center">
+                                <span className="block text-xs uppercase tracking-[0.24em] text-slate-400">Accounts</span>
+                                <span className="mt-2 text-2xl font-bold text-white">{tokensList.length}</span>
+                            </div>
+                            <div className="rounded-3xl bg-slate-950/70 border border-slate-800/90 p-4 text-center">
+                                <span className="block text-xs uppercase tracking-[0.24em] text-slate-400">Live State</span>
+                                <span className={`mt-2 text-2xl font-bold ${isCopyTrading ? 'text-emerald-300' : 'text-amber-300'}`}>
+                                    {isCopyTrading ? 'Active' : 'Idle'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="rounded-[32px] border border-slate-800/80 bg-slate-900/70 p-6 shadow-xl shadow-slate-950/40 backdrop-blur-xl">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Security</p>
+                            <h2 className="mt-2 text-xl font-bold text-white">Token-safe workflow</h2>
+                        </div>
+                        <span className="inline-flex items-center rounded-full bg-slate-800/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300 border border-cyan-500/15">
+                            Secure mode
+                        </span>
+                    </div>
+                    <p className="mt-4 text-sm text-slate-400 leading-6">
+                        Store your linked client tokens securely and manage replication with confidence. Sync updates instantly across all connected accounts.
+                    </p>
+                </div>
+            </div>
+
             {/* Top Bar - Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 {/* Demo to Real Card */}

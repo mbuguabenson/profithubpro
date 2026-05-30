@@ -6,7 +6,7 @@ export const LOADER_CONFIG = {
     DURATION: 6000,
 
     // Whether to show the loader (useful for development vs production)
-    ENABLED: true,
+    ENABLED: false, // loader disabled to remove the welcome screen and dollars background
 
     // App branding
     BRANDING: {
