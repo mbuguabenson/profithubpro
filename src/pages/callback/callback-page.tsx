@@ -11,11 +11,10 @@ const CallbackPage: React.FC = () => {
             const result = await handleCallback();
             if (result.success) {
                 setStatus('success');
-                setMessage('Login successful! Redirecting...');
-                // Redirect to main app after a short delay
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 2000);
+                setMessage('Login successful! [REDIRECT DISABLED FOR DEBUGGING - check console logs]');
+                // setTimeout(() => {
+                //     window.location.href = '/';
+                // }, 2000);
             } else {
                 setStatus('error');
                 setMessage(result.error || 'Authentication failed');
