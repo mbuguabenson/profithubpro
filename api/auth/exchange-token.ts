@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 
-const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
+const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33pC7qk8i9WtRbTbSOkcq';
 // Canonical redirect URI must match the registered OAuth redirect exactly.
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
 

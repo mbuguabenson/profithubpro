@@ -15,26 +15,41 @@ export async function startSignup(): Promise<void> {
 }
 
 export async function handleCallback(): Promise<{ success: boolean; error?: string }> {
+    console.log('📍 [Frontend] Callback handler triggered');
+    console.log('📍 [Frontend] URL:', window.location.href);
+    console.log('📍 [Frontend] Search params:', window.location.search);
+    
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
     const error = urlParams.get('error');
     const errorDescription = urlParams.get('error_description');
 
+    console.log('📍 [Frontend] Parsed params:', {
+        code: code ? code.substring(0, 20) + '...' : 'null',
+        state: state ? state.substring(0, 20) + '...' : 'null',
+        error,
+        errorDescription
+    });
+
     if (error) {
+        console.error('❌ [Frontend] OAuth error:', error, errorDescription);
         return { success: false, error: errorDescription || error };
     }
 
     if (!code || !state) {
+        console.error('❌ [Frontend] Missing code or state:', { code: !!code, state: !!state });
         return { success: false, error: 'Missing code or state parameter' };
     }
 
     if (!validatePKCEState(state)) {
+        console.error('❌ [Frontend] State validation failed');
         return { success: false, error: 'State mismatch' };
     }
 
     const codeVerifier = popPKCEVerifier();
     if (!codeVerifier) {
+        console.error('❌ [Frontend] Code verifier not found in sessionStorage');
         return { success: false, error: 'Code verifier not found' };
     }
 

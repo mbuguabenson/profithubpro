@@ -135,7 +135,7 @@ export const getDebugServiceWorker = () => {
     return false;
 };
 
-const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33p2ypvZpsMU9BVEK4fkV';
+const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33pC7qk8i9WtRbTbSOkcq';
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
 
 export const getClientId = () => {
@@ -154,7 +154,12 @@ export const generateOAuthURL = async (prompt?: string) => {
     const state = createState();
     storePKCEState(code_verifier, state);
 
-    console.log('🔐 OAuth URL Parameters:', { client_id, redirect_uri, scope: 'trade+account_manage' });
+    console.log('🔐 [Frontend] PKCE State stored:', { 
+        state, 
+        code_verifier: code_verifier.substring(0, 20) + '...',
+        code_challenge: code_challenge.substring(0, 20) + '...',
+        redirect_uri 
+    });
 
     let oauthUrl = `${DERIV_NEW_AUTH_URL}?response_type=code`;
     oauthUrl += `&client_id=${encodeURIComponent(client_id)}`;
@@ -167,6 +172,8 @@ export const generateOAuthURL = async (prompt?: string) => {
     if (prompt) {
         oauthUrl += `&prompt=${encodeURIComponent(prompt)}`;
     }
+
+    console.log('🔐 [Frontend] Full OAuth URL:', oauthUrl.substring(0, 100) + '...');
 
     return oauthUrl;
 };
