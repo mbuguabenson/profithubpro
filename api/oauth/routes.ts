@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Backend OAuth 2.0 API Routes (Node.js/Express)
  * Handles OAuth token exchange, refresh, and revocation

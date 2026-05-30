@@ -1,4 +1,3 @@
-import React from 'react';
 import ContentLoader from 'react-content-loader';
 import { contract_stages } from '@/constants/contract-stage';
 import ContractCardRunningBot from './contract-card-running-bot';

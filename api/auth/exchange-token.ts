@@ -40,25 +40,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Invalid request' });
     }
 
-    // Enforce the exact canonical redirect URI used for the OAuth flow.
-    // Only allow the configured redirect URI or a localhost callback during local testing.
-    try {
-        const incoming = new URL(redirect_uri);
-        const base = new URL(REDIRECT_URI);
-        const incoming_path = incoming.pathname.replace(/\/$/, '') || '/';
-        const base_path = base.pathname.replace(/\/$/, '') || '/callback';
-        const is_incoming_localhost = incoming.hostname === 'localhost' || incoming.hostname === '127.0.0.1';
-        const base_origin_matches = incoming.origin === base.origin || is_incoming_localhost;
-        const allowed_paths = [base_path];
+    // Enforce a safe redirect URI for the OAuth flow.
+    // Allow the configured canonical redirect URI if provided, otherwise allow the current app origin if it matches the request origin.
+        try {
+            const incoming = new URL(redirect_uri);
+            const incoming_path = incoming.pathname.replace(/\/$/, '') || '/callback';
+            const origin_header = typeof req.headers.origin === 'string' ? req.headers.origin : null;
+            const allowed_localhost = incoming.hostname === 'localhost' || incoming.hostname === '127.0.0.1';
 
-        if (!base_origin_matches || !allowed_paths.includes(incoming_path)) {
-            console.warn('Rejecting unexpected redirect_uri', { redirect_uri, allowed_origin: base.origin, incoming_origin: incoming.origin, incoming_path });
+            if (REDIRECT_URI) {
+                const base = new URL(REDIRECT_URI);
+                const base_path = base.pathname.replace(/\/$/, '') || '/callback';
+                const base_origin_matches = incoming.origin === base.origin || allowed_localhost;
+                const allowed_paths = [base_path];
+
+                if (!base_origin_matches || !allowed_paths.includes(incoming_path)) {
+                    console.warn('Rejecting unexpected redirect_uri', {
+                        redirect_uri,
+                        allowed_origin: base.origin,
+                        incoming_origin: incoming.origin,
+                        incoming_path,
+                    });
+                    return res.status(400).json({ error: 'Invalid redirect_uri' });
+                }
+            } else if (origin_header) {
+                const is_same_origin = incoming.origin === origin_header;
+                if (!is_same_origin && !allowed_localhost) {
+                    console.warn('Rejecting unexpected redirect_uri for dynamic callback', {
+                        redirect_uri,
+                        origin_header,
+                        incoming_origin: incoming.origin,
+                    });
+                    return res.status(400).json({ error: 'Invalid redirect_uri' });
+                }
+                if (incoming_path !== '/callback') {
+                    console.warn('Rejecting unexpected callback path', { redirect_uri, incoming_path });
+                    return res.status(400).json({ error: 'Invalid redirect_uri' });
+                }
+            } else {
+                console.warn('Missing origin header when validating redirect_uri', { redirect_uri });
+                return res.status(400).json({ error: 'Invalid redirect_uri' });
+            }
+        } catch (err) {
+            console.warn('Invalid redirect_uri format', { redirect_uri, err });
             return res.status(400).json({ error: 'Invalid redirect_uri' });
         }
-    } catch (err) {
-        console.warn('Invalid redirect_uri format', { redirect_uri, err });
-        return res.status(400).json({ error: 'Invalid redirect_uri' });
-    }
 
     try {
         console.log('🔑 [Backend] Deriv token exchange request:', {

@@ -3,6 +3,7 @@ import { api_base, ApiHelpers } from '@/external/bot-skeleton';
 import { DigitStatsEngine } from '@/lib/digit-stats-engine';
 import { DigitTradeEngine } from '@/lib/digit-trade-engine';
 import RootStore from './root-store';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 
 export type TDigitStat = {
     digit: number;
@@ -404,7 +405,7 @@ export default class AnalysisStore {
 
         if (this.active_stream_id && api_base.api) {
             try {
-                api_base.api.send({ forget: this.active_stream_id });
+                api_base.api.send(transformRequest({ forget: this.active_stream_id }, 'forget'));
             } catch (e) {
                 // Ignore forget errors
             }
@@ -418,33 +419,36 @@ export default class AnalysisStore {
 
             let response: any;
             try {
-                response = await api_base.api.send({
+                const req = transformRequest({
                     ticks_history: this.symbol,
                     count: safeCount,
                     end: 'latest',
                     style: 'ticks',
                     subscribe: 1,
-                });
+                }, 'ticks_history');
+                response = await api_base.api.send(req);
 
                 if (response?.error?.code === 'AlreadySubscribed') {
                     // If already subscribed, just fetch history once and reuse the existing global listener logic
-                    response = await api_base.api.send({
+                    const backupReq = transformRequest({
                         ticks_history: this.symbol,
                         count: safeCount,
                         end: 'latest',
                         style: 'ticks',
-                    });
+                    }, 'ticks_history');
+                    response = await api_base.api.send(backupReq);
                 } else if (response?.error) {
                     throw new Error(response.error.message);
                 }
             } catch (err: any) {
                 if (err.error?.code === 'AlreadySubscribed') {
-                    response = await api_base.api.send({
+                    const backupReq = transformRequest({
                         ticks_history: this.symbol,
                         count: safeCount,
                         end: 'latest',
                         style: 'ticks',
-                    });
+                    }, 'ticks_history');
+                    response = await api_base.api.send(backupReq);
                 } else {
                     throw err;
                 }
@@ -481,8 +485,11 @@ export default class AnalysisStore {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const subscription = api_base.api.onMessage().subscribe((msg: any) => {
                 const data = msg.data || msg;
-                if (data.msg_type === 'tick' && data.tick && data.tick.symbol === this.symbol) {
-                    this.handleTick(data.tick);
+                if (data.msg_type === 'tick') {
+                    const transformed = transformResponse(data, 'tick');
+                    if (transformed?.tick && transformed.tick.symbol === this.symbol) {
+                        this.handleTick(transformed.tick);
+                    }
                 }
             });
 
@@ -564,9 +571,11 @@ export default class AnalysisStore {
         let symbols: any[] = [];
         try {
             if (api_base.api) {
-                const response = await api_base.api.send({ active_symbols: 'brief', product_type: 'basic' });
-                if (response.active_symbols && response.active_symbols.length > 0) {
-                    symbols = response.active_symbols;
+                const req = transformRequest({ active_symbols: 'brief', product_type: 'basic' }, 'active_symbols');
+                const response = await api_base.api.send(req);
+                const transformed = transformResponse(response, 'active_symbols');
+                if (transformed.active_symbols && transformed.active_symbols.length > 0) {
+                    symbols = transformed.active_symbols;
                 }
             }
         } catch (error) {

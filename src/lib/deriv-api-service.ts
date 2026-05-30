@@ -48,6 +48,7 @@ class DerivApiService {
     private latency: number = 0;
     private pingStartTime: number = 0;
     private apiToken: string | null = null;
+    private otpUrl: string | null = null;
     private isManuallyDisconnected: boolean = false;
 
     private constructor() {
@@ -68,6 +69,7 @@ class DerivApiService {
 
         this.isManuallyDisconnected = false;
         this.apiToken = token || this.apiToken;
+        this.otpUrl = null;
         this.setState(ConnectionState.CONNECTING);
 
         try {
@@ -107,6 +109,54 @@ class DerivApiService {
             };
         } catch (error) {
             console.error('[DerivApiService] Failed to establish connection:', error);
+            this.setState(ConnectionState.ERROR);
+            this.attemptReconnect();
+        }
+    }
+
+    public connectWithOtp(otpUrl: string): void {
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+            if (this.otpUrl === otpUrl) {
+                return;
+            }
+            this.disconnect();
+        }
+
+        this.isManuallyDisconnected = false;
+        this.otpUrl = otpUrl;
+        this.setState(ConnectionState.CONNECTING);
+
+        try {
+            this.ws = new WebSocket(otpUrl);
+
+            this.ws.onopen = () => {
+                console.log('[DerivApiService] WebSocket connected with OTP');
+                this.setState(ConnectionState.AUTHORIZED);
+                this.reconnectAttempts = 0;
+                this.startPing();
+                this.restoreSubscriptions();
+            };
+
+            this.ws.onmessage = event => {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            };
+
+            this.ws.onerror = error => {
+                console.error('[DerivApiService] OTP WebSocket error:', error);
+                this.setState(ConnectionState.ERROR);
+            };
+
+            this.ws.onclose = () => {
+                console.log('[DerivApiService] OTP WebSocket closed');
+                this.stopPing();
+                if (!this.isManuallyDisconnected) {
+                    this.setState(ConnectionState.DISCONNECTED);
+                    this.attemptReconnect();
+                }
+            };
+        } catch (error) {
+            console.error('[DerivApiService] Failed to establish OTP connection:', error);
             this.setState(ConnectionState.ERROR);
             this.attemptReconnect();
         }
@@ -213,6 +263,11 @@ class DerivApiService {
     }
 
     private handleMessage(data: TDerivResponse): void {
+        if (!data || typeof data !== 'object') {
+            console.log('[DerivApiService] Received non-object payload:', data);
+            return;
+        }
+
         const transformedData = transformResponse(data);
 
         // Handle pending requests via req_id
@@ -275,6 +330,24 @@ class DerivApiService {
         console.error(`[DerivApiService] API Error: ${error.code} - ${error.message}`);
         if (error.code === 'InvalidToken' || error.code === 'AuthorizationRequired') {
             this.setState(ConnectionState.ERROR);
+            return;
+        }
+
+        if (error.code === 'RequestLimit') {
+            console.warn('[DerivApiService] Rate limit hit. Backing off...');
+            this.minReconnectDelay = Math.min(this.minReconnectDelay * 2, 10000);
+            this.maxReconnectDelay = Math.min(this.maxReconnectDelay * 2, 30000);
+            return;
+        }
+
+        if (error.code === 'DuplicateRequest') {
+            console.warn('[DerivApiService] Duplicate request rejected:', error.message);
+            return;
+        }
+
+        if (error.code === 'InvalidParamValue') {
+            console.error('[DerivApiService] Invalid parameter sent:', error.message);
+            return;
         }
     }
 
@@ -295,7 +368,11 @@ class DerivApiService {
 
         this.reconnectTimeout = setTimeout(() => {
             this.reconnectAttempts++;
-            this.connect();
+            if (this.otpUrl) {
+                this.connectWithOtp(this.otpUrl);
+            } else {
+                this.connect();
+            }
         }, delay);
     }
 

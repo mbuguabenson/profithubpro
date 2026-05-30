@@ -25,7 +25,7 @@ type TDialog = {
     onCancel?: () => void;
     onClose?: () => void;
     onConfirm: () => void;
-    login: () => void;
+    login?: () => void;
     onEscapeButtonCancel?: () => void;
     portal_element_id?: string;
     title?: React.ReactNode;
@@ -79,7 +79,7 @@ const Dialog = ({
 
     const handleCancel = () => {
         if (cancel_button_text === localize('Log in')) {
-            login();
+            login?.();
         } else {
             if (is_closed_on_cancel && enableApp) {
                 enableApp();

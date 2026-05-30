@@ -15,7 +15,8 @@ const Download = observer(({ tab }: TDownloadProps) => {
     const { filtered_messages } = journal;
     const { transactions: transaction_list } = transactions;
     let disabled = false;
-    let clickFunction, popover_message;
+    let clickFunction: (() => void) | undefined;
+    let popover_message: React.ReactNode = '';
 
     const downloadTransaction = () => {
         const items = [

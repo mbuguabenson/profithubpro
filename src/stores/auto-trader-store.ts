@@ -1,6 +1,7 @@
 import { action, makeObservable, observable, reaction, runInAction } from 'mobx';
 import { api_base, ApiHelpers } from '@/external/bot-skeleton';
 import RootStore from './root-store';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 
 export type TDigitStat = {
     digit: number;
@@ -525,7 +526,7 @@ export default class AutoTraderStore {
         try {
             if (!api_base.api) return;
 
-            const proposal_response = await api_base.api.send({
+            const proposal_req = transformRequest({
                 proposal: 1,
                 amount: current_stake,
                 basis: 'stake',
@@ -535,7 +536,8 @@ export default class AutoTraderStore {
                 duration_unit: 't',
                 symbol: this.symbol,
                 ...(barrier ? { barrier } : {}),
-            });
+            }, 'proposal');
+            const proposal_response = transformResponse(await api_base.api.send(proposal_req), 'proposal');
 
             if (proposal_response.error) {
                 console.error('Strategy Proposal Error:', proposal_response.error);
@@ -545,10 +547,11 @@ export default class AutoTraderStore {
             const proposal_id = proposal_response.proposal?.id;
             if (!proposal_id) return;
 
-            const buy_response = await api_base.api.send({
+            const buy_req = transformRequest({
                 buy: proposal_id,
                 price: current_stake,
-            });
+            }, 'buy');
+            const buy_response = transformResponse(await api_base.api.send(buy_req), 'buy');
 
             if (buy_response.error) {
                 console.error('Strategy Buy Error:', buy_response.error);
@@ -560,7 +563,8 @@ export default class AutoTraderStore {
 
             // Monitor result (Simplified)
             setTimeout(async () => {
-                const poc = await api_base.api.send({ proposal_open_contract: 1, contract_id });
+                const poc_req = transformRequest({ proposal_open_contract: 1, contract_id }, 'proposal_open_contract');
+                const poc = transformResponse(await api_base.api.send(poc_req), 'proposal_open_contract');
                 if (poc?.proposal_open_contract) {
                     const profit = poc.proposal_open_contract.profit || 0;
                     const is_win = profit > 0;
@@ -714,7 +718,7 @@ export default class AutoTraderStore {
             }
 
             // Step 1: Get proposal
-            const proposal_response = await api_base.api.send({
+            const proposal_req = transformRequest({
                 proposal: 1,
                 amount: current_stake,
                 basis: 'stake',
@@ -724,7 +728,8 @@ export default class AutoTraderStore {
                 duration_unit: 't',
                 symbol: this.symbol,
                 barrier,
-            });
+            }, 'proposal');
+            const proposal_response = transformResponse(await api_base.api.send(proposal_req), 'proposal');
 
             if (proposal_response.error) {
                 console.error('AutoTrader Proposal Error:', proposal_response.error);
@@ -742,10 +747,11 @@ export default class AutoTraderStore {
             }
 
             // Step 2: Buy the contract
-            const buy_response = await api_base.api.send({
+            const buy_req = transformRequest({
                 buy: proposal_id,
                 price: current_stake,
-            });
+            }, 'buy');
+            const buy_response = transformResponse(await api_base.api.send(buy_req), 'buy');
 
             if (buy_response.error) {
                 console.error('AutoTrader Buy Error:', buy_response.error);
@@ -761,10 +767,11 @@ export default class AutoTraderStore {
             // Step 3: Monitor contract result
             setTimeout(async () => {
                 try {
-                    const poc_response = await api_base.api.send({
+                    const poc_req = transformRequest({
                         proposal_open_contract: 1,
                         contract_id,
-                    });
+                    }, 'proposal_open_contract');
+                    const poc_response = transformResponse(await api_base.api.send(poc_req), 'proposal_open_contract');
 
                     if (poc_response?.proposal_open_contract) {
                         const contract = poc_response.proposal_open_contract;

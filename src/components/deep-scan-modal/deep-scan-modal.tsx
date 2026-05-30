@@ -100,7 +100,6 @@ const DeepScanModal: React.FC<DeepScanModalProps> = ({ isOpen, onClose, onLoadSi
                     // Analyze for strong patterns (matching AI Trading scanner logic)
                     const digitsGreaterThan4 = digits.filter(d => d > 4).length;
                     const digitsLessThan7 = digits.filter(d => d < 7).length;
-                    const digitsGreaterThan5 = digits.filter(d => d > 5).length; // For Over 1
 
                     // Check for strong OVER signals
                     if (digitsGreaterThan4 >= 7) {

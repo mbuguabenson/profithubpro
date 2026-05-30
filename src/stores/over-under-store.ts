@@ -1,6 +1,7 @@
 import { action, makeObservable, observable, runInAction, computed } from 'mobx';
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import RootStore from './root-store';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 
 export type TPrediction = 'UNDER' | 'OVER' | 'CURRENT' | 'WAIT';
 export type TConfidenceLevel = 'VERY HIGH' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -82,9 +83,11 @@ export default class OverUnderStore {
     @action
     private fetchActiveSymbols() {
         if (!this.isApiReady()) return;
-        api_base.api!.send({ active_symbols: 'brief', product_type: 'basic' }).then((res: any) => {
-            if (res?.active_symbols) {
-                const filtered = res.active_symbols
+        const req = transformRequest({ active_symbols: 'brief', product_type: 'basic' }, 'active_symbols');
+        api_base.api!.send(req).then((res: any) => {
+            const transformed = transformResponse(res, 'active_symbols');
+            if (transformed?.active_symbols) {
+                const filtered = transformed.active_symbols
                     .filter((s: any) => s.market === 'synthetic_index' && s.submarket === 'random_index')
                     .map((s: any) => ({ symbol: s.symbol, display_name: s.display_name }));
                 runInAction(() => {
@@ -121,28 +124,31 @@ export default class OverUnderStore {
                     return;
                 }
 
-                if (data.msg_type === 'tick' && data.tick?.symbol === this.symbol) {
-                    const tick = data.tick;
-                    const quote = tick.quote.toString();
-                    const digit = parseInt(quote.slice(-1));
-                    
-                    runInAction(() => {
-                        this.current_price = tick.quote.toFixed(tick.pip_size || 2);
-                        this.recent_digits = [...this.recent_digits, digit].slice(-100);
-                        this.confirmed_ticks++;
+                if (data.msg_type === 'tick') {
+                    const transformed = transformResponse(data, 'tick');
+                    if (transformed?.tick?.symbol === this.symbol) {
+                        const tick = transformed.tick;
+                        const quote = tick.quote.toString();
+                        const digit = parseInt(quote.slice(-1));
                         
-                        if (this.phase === 2) {
-                            this.phase2_ticks++;
-                            if (this.phase2_ticks >= 20) {
-                                this.phase = 1;
+                        runInAction(() => {
+                            this.current_price = tick.quote.toFixed(tick.pip_size || 2);
+                            this.recent_digits = [...this.recent_digits, digit].slice(-100);
+                            this.confirmed_ticks++;
+                            
+                            if (this.phase === 2) {
+                                this.phase2_ticks++;
+                                if (this.phase2_ticks >= 20) {
+                                    this.phase = 1;
+                                    this.phase2_ticks = 0;
+                                }
+                            } else if (this.analysis.marketPower >= 53) {
+                                this.phase = 2;
                                 this.phase2_ticks = 0;
                             }
-                        } else if (this.analysis.marketPower >= 53) {
-                            this.phase = 2;
-                            this.phase2_ticks = 0;
-                        }
-                        this.last_confidence = this.confidence.maxPercent;
-                    });
+                            this.last_confidence = this.confidence.maxPercent;
+                        });
+                    }
                 }
 
                 if (data.msg_type === 'history' && data.echo_req?.ticks_history === this.symbol) {
@@ -156,17 +162,19 @@ export default class OverUnderStore {
             });
 
             // Start real-time stream
-            api_base.api.send({ ticks: this.symbol, subscribe: 1 }).catch((e: any) =>
+            const ticksReq = transformRequest({ ticks: this.symbol, subscribe: 1 }, 'ticks');
+            api_base.api.send(ticksReq).catch((e: any) =>
                 console.warn('[OverUnderStore] ticks subscribe error:', e)
             );
 
             // Initial historical data
-            api_base.api.send({
+            const ticksHistoryReq = transformRequest({
                 ticks_history: this.symbol,
                 count: 100,
                 end: 'latest',
                 style: 'ticks',
-            }).catch((e: any) =>
+            }, 'ticks_history');
+            api_base.api.send(ticksHistoryReq).catch((e: any) =>
                 console.warn('[OverUnderStore] ticks_history error:', e)
             );
 
@@ -180,7 +188,7 @@ export default class OverUnderStore {
         };
 
         // Try forget_all first, but don't let it block if it fails
-        api_base.api!.send({ forget_all: 'ticks' })
+        api_base.api!.send(transformRequest({ forget_all: 'ticks' }, 'forget_all'))
             .then(() => doSubscribe())
             .catch(() => {
                 console.warn('[OverUnderStore] forget_all failed, subscribing anyway');

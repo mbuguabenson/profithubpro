@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { localize } from '@deriv/translations';
 import './floating-ai-button.scss';
 
 interface FloatingAIButtonProps {

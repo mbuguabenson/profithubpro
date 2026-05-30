@@ -2,6 +2,7 @@ import Cookies from 'js-cookie';
 import CommonStore from '@/stores/common-store';
 import { TAuthData } from '@/types/api-types';
 import { clearAuthData } from '@/utils/auth-utils';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 import { observer as globalObserver } from '../../utils/observer';
 import { doUntilDone, socket_state } from '../tradeEngine/utils/helpers';
 import {
@@ -89,6 +90,31 @@ class APIBase {
             this.unsubscribeAllSubscriptions();
         }
 
+        const token = V2GetActiveToken();
+        const account_id = V2GetActiveClientId();
+        let otp_ws_url = '';
+
+        if (token && account_id) {
+            try {
+                // Fetch authenticated OTP WebSocket URL
+                const response = await fetch('/api/ws/otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ accountId: account_id }),
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    otp_ws_url = data.ws_url || data.wsUrl || '';
+                    console.log('[APIBase] Retained authenticated OTP WS URL');
+                }
+            } catch (e) {
+                console.error('[APIBase] Failed to get OTP url:', e);
+            }
+        }
+
         if (!this.api || this.api?.connection.readyState !== 1 || force_create_connection) {
             if (this.api?.connection) {
                 ApiHelpers.disposeInstance();
@@ -97,7 +123,65 @@ class APIBase {
                 this.api.connection.removeEventListener('open', this.onsocketopen.bind(this));
                 this.api.connection.removeEventListener('close', this.onsocketclose.bind(this));
             }
-            this.api = generateDerivApiInstance();
+            const original_api = generateDerivApiInstance(otp_ws_url);
+            const wrapped_api = new Proxy(original_api, {
+                get(target, prop, receiver) {
+                    if (prop === 'authorize') {
+                        return async (token: string) => {
+                            console.log('[APIBase Proxy] Intercepting authorize call, returning cached auth state...');
+                            const loginId = localStorage.getItem('active_loginid') || '';
+                            const clientAccounts = JSON.parse(localStorage.getItem('clientAccounts') || '{}');
+                            const account_list = Object.values(clientAccounts).map((acc: any) => ({
+                                loginid: acc.loginid,
+                                currency: acc.currency,
+                                is_virtual: acc.loginid.startsWith('VRTC') ? 1 : 0,
+                            }));
+                            const country = localStorage.getItem('client.country') || '';
+                            return {
+                                authorize: {
+                                    loginid: loginId,
+                                    account_list,
+                                    country,
+                                    currency: 'USD',
+                                    is_virtual: loginId.startsWith('VRTC') ? 1 : 0,
+                                },
+                                error: null
+                            };
+                        };
+                    }
+                    if (prop === 'send') {
+                        return (data: any) => {
+                            let req_type = null;
+                            if (data && typeof data === 'object') {
+                                req_type = Object.keys(data).find(k => k !== 'req_id');
+                            }
+                            const transformed = req_type ? transformRequest(data, req_type) : data;
+                            return target.send(transformed);
+                        };
+                    }
+                    if (prop === 'onMessage') {
+                        return () => {
+                            const original_observable = target.onMessage();
+                            return {
+                                subscribe: (callback: any) => {
+                                    return original_observable.subscribe((msg: any) => {
+                                        if (msg?.data) {
+                                            const transformedData = transformResponse(msg.data, msg.data.msg_type);
+                                            callback({ ...msg, data: transformedData });
+                                        } else {
+                                            const transformedMsg = transformResponse(msg, msg.msg_type);
+                                            callback(transformedMsg);
+                                        }
+                                    });
+                                }
+                            };
+                        };
+                    }
+                    const value = Reflect.get(target, prop, receiver);
+                    return typeof value === 'function' ? value.bind(target) : value;
+                }
+            });
+            this.api = wrapped_api as any;
             this.api?.connection.addEventListener('open', this.onsocketopen.bind(this));
             this.api?.connection.addEventListener('close', this.onsocketclose.bind(this));
         }

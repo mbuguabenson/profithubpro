@@ -23,6 +23,7 @@ export const domain_app_ids = {
 };
 
 const LEGACY_APP_ID_STORAGE_KEY = 'config.legacy_app_id';
+const LEGACY_APP_ID_ENV = process.env.LEGACY_APP_ID?.trim();
 const LEGACY_MODE_STORAGE_KEY = 'config.enable_legacy_mode';
 
 export const normalizeDomain = (hostname: string) =>
@@ -54,8 +55,9 @@ export const isLocal = () => /localhost(:\d+)?$/i.test(window.location.hostname)
 
 export const getLegacyAppId = (): number | null => {
     const storedLegacy = window.localStorage.getItem(LEGACY_APP_ID_STORAGE_KEY);
-    if (!storedLegacy) return null;
-    return /^[0-9]+$/.test(storedLegacy) ? Number(storedLegacy) : null;
+    const legacySource = storedLegacy || LEGACY_APP_ID_ENV;
+    if (!legacySource) return null;
+    return /^[0-9]+$/.test(legacySource) ? Number(legacySource) : null;
 };
 
 export const isLegacyModeEnabled = (): boolean => {
@@ -150,14 +152,24 @@ export const getDebugServiceWorker = () => {
 };
 
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33pC7qk8i9WtRbTbSOkcq';
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
+const REDIRECT_URI = process.env.REDIRECT_URI?.trim();
 
 export const getClientId = () => {
     return OAUTH_CLIENT_ID;
 };
 
 export const getRedirectUri = () => {
-    return REDIRECT_URI;
+    if (isLocal()) {
+        const origin = window.location.origin;
+        return `${origin}/callback`;
+    }
+
+    if (REDIRECT_URI) {
+        return REDIRECT_URI;
+    }
+
+    const origin = window.location.origin;
+    return `${origin}/callback`;
 };
 
 export const generateOAuthURL = async (prompt?: string) => {

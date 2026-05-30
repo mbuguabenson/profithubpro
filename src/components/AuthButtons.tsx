@@ -14,7 +14,7 @@ const AuthButtons: React.FC = () => {
     return (
         <div style={{ display: 'flex', gap: '10px' }}>
             <Button onClick={handleLogin}>Login</Button>
-            <Button onClick={handleSignup} variant="secondary">Signup</Button>
+            <Button onClick={handleSignup} variant="outlined">Signup</Button>
         </div>
     );
 };

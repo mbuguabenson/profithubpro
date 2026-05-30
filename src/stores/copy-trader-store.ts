@@ -2,6 +2,7 @@ import { action, makeObservable, observable, reaction, runInAction } from 'mobx'
 import { ProposalOpenContract } from '@deriv/api-types';
 import RootStore from './root-store';
 import { getAppId } from '@/components/shared';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 
 export type TCopyAccount = {
     token: string;
@@ -219,7 +220,7 @@ export default class CopyTraderStore {
 
                 try {
                     // Step 1: Get proposal on target account
-                    const proposal_request = {
+                    const proposal_request = transformRequest({
                         proposal: 1,
                         amount: stake,
                         basis: 'stake',
@@ -229,14 +230,14 @@ export default class CopyTraderStore {
                         duration_unit: 't',
                         symbol: contract.underlying,
                         barrier: contract.barrier,
-                    };
+                    }, 'proposal');
 
                     target.ws!.send(JSON.stringify(proposal_request));
 
                     // Wait for proposal response
                     const proposal_response = await new Promise<any>((resolve, reject) => {
                         const handler = (event: MessageEvent) => {
-                            const data = JSON.parse(event.data);
+                            const data = transformResponse(JSON.parse(event.data), 'proposal');
                             if (data.msg_type === 'proposal') {
                                 target.ws!.removeEventListener('message', handler);
                                 resolve(data);
@@ -270,10 +271,10 @@ export default class CopyTraderStore {
                     }
 
                     // Step 2: Buy the contract on target account
-                    const buy_request = {
+                    const buy_request = transformRequest({
                         buy: proposal_id,
                         price: stake,
-                    };
+                    }, 'buy');
 
                     target.ws!.send(JSON.stringify(buy_request));
 
@@ -448,7 +449,7 @@ export default class CopyTraderStore {
             const currency = real_account?.currency || 'USD';
 
             // Step 1: Get proposal on real account
-            const proposal_request = {
+            const proposal_request = transformRequest({
                 proposal: 1,
                 amount: stake,
                 basis: 'stake',
@@ -458,14 +459,14 @@ export default class CopyTraderStore {
                 duration_unit: 't',
                 symbol: contract.underlying,
                 barrier: contract.barrier,
-            };
+            }, 'proposal');
 
             this.real_account_ws.send(JSON.stringify(proposal_request));
 
             // Wait for proposal response
             const proposal_response = await new Promise<any>((resolve, reject) => {
                 const handler = (event: MessageEvent) => {
-                    const data = JSON.parse(event.data);
+                    const data = transformResponse(JSON.parse(event.data), 'proposal');
                     if (data.msg_type === 'proposal') {
                         this.real_account_ws!.removeEventListener('message', handler);
                         resolve(data);
@@ -497,10 +498,10 @@ export default class CopyTraderStore {
             if (!proposal_id) return;
 
             // Step 2: Buy the contract on real account
-            const buy_request = {
+            const buy_request = transformRequest({
                 buy: proposal_id,
                 price: stake,
-            };
+            }, 'buy');
 
             this.real_account_ws.send(JSON.stringify(buy_request));
 

@@ -1,6 +1,7 @@
 import Cookies from 'js-cookie';
 import { getAppId, getRedirectUri } from '@/components/shared/utils/config/config';
 import { clearPKCEVerifier, popPKCEVerifier, validatePKCEState } from '@/utils/pkce';
+import derivApiService from '@/lib/deriv-api-service';
 
 export async function startLogin(): Promise<void> {
     const { generateOAuthURL } = await import('@/components/shared/utils/config/config');
@@ -162,5 +163,43 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
     } catch (err) {
         console.error('Error exchanging token:', err);
         return { success: false, error: 'Network error during token exchange' };
+    }
+}
+
+export async function connectAuthenticatedWebSocket(accountId: string): Promise<boolean> {
+    const accessToken = localStorage.getItem('authToken');
+    if (!accessToken) {
+        console.error('No authorization token found');
+        return false;
+    }
+
+    try {
+        const response = await fetch('/api/ws/otp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ accountId }),
+        });
+
+        if (!response.ok) {
+            console.error('Failed to get OTP url:', response.statusText);
+            return false;
+        }
+
+        const data = await response.json();
+        const wsUrl = data.ws_url || data.wsUrl;
+        if (!wsUrl) {
+            console.error('No ws_url returned from OTP endpoint', data);
+            return false;
+        }
+
+        console.log('Connecting DerivApiService using OTP ws_url...');
+        derivApiService.connectWithOtp(wsUrl);
+        return true;
+    } catch (e) {
+        console.error('Failed to establish authenticated WebSocket connection:', e);
+        return false;
     }
 }

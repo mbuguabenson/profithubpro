@@ -2,6 +2,7 @@ import { action, makeObservable, observable, runInAction } from 'mobx';
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { DigitStatsEngine } from '@/lib/digit-stats-engine';
 import RootStore from './root-store';
+import { transformRequest, transformResponse } from '@/utils/api-migration-adapter';
 
 type TMarketkillerSubtab = 'matches';
 
@@ -136,7 +137,7 @@ export default class MarketkillerStore {
 
         let buyRes: any;
         try {
-            buyRes = await api_base.api.send({
+            const req = transformRequest({
                 buy: '1',
                 price: safeStake,
                 parameters: {
@@ -149,7 +150,8 @@ export default class MarketkillerStore {
                     symbol: config.symbol,
                     barrier: String(config.barrier),
                 },
-            });
+            }, 'buy');
+            buyRes = await api_base.api.send(req);
         } catch (e: any) {
             const msg = this.extractErrorMsg(e);
             const isRateLimit = msg.includes('429') || msg.toLowerCase().includes('ratelimit') || msg.toLowerCase().includes('rate limit');
@@ -276,7 +278,7 @@ export default class MarketkillerStore {
 
         try {
             console.log('[Marketkiller] Subscribing to ticks for:', this.symbol);
-            const req = { ticks: this.symbol, subscribe: 1 };
+            const req = transformRequest({ ticks: this.symbol, subscribe: 1 }, 'ticks');
             const response = await api_base.api.send(req);
 
             if (response.error) {
@@ -290,8 +292,11 @@ export default class MarketkillerStore {
             // Register fresh RxJS event listener for the tick stream
             if (api_base.api.onMessage) {
                 this.tick_listener_sub = api_base.api.onMessage().subscribe((res: any) => {
-                    if (res?.data?.msg_type === 'tick' && res?.data?.tick?.symbol === this.symbol) {
-                        this.onTickArrival(res.data.tick);
+                    if (res?.data?.msg_type === 'tick') {
+                        const transformed = transformResponse(res.data, 'tick');
+                        if (transformed?.tick?.symbol === this.symbol) {
+                            this.onTickArrival(transformed.tick);
+                        }
                     }
                 });
             }
@@ -306,7 +311,8 @@ export default class MarketkillerStore {
 
         this.live_market_ribbon.forEach(async m => {
             try {
-                const response = await api_base.api.send({ ticks: m.symbol, subscribe: 1 });
+                const req = transformRequest({ ticks: m.symbol, subscribe: 1 }, 'ticks');
+                const response = await api_base.api.send(req);
                 if (response.subscription) {
                     this.ribbon_subscriptions.set(m.symbol, response.subscription.id);
                 }
@@ -316,18 +322,21 @@ export default class MarketkillerStore {
         });
 
         api_base.api.onMessage().subscribe((res: any) => {
-            if (res?.data?.msg_type === 'tick' && res?.data?.tick) {
-                const tick = res.data.tick;
-                const index = this.live_market_ribbon.findIndex(m => m?.symbol === tick.symbol);
-                if (index !== -1) {
-                    runInAction(() => {
-                        const m = this.live_market_ribbon[index];
-                        if (!m) return;
-                        const price = parseFloat(tick.quote).toFixed(tick.pip_size || 2);
-                        m.is_up = parseFloat(price) >= parseFloat(String(m.price));
-                        m.price = price;
-                        m.digit = parseInt(price.slice(-1));
-                    });
+            if (res?.data?.msg_type === 'tick') {
+                const transformed = transformResponse(res.data, 'tick');
+                const tick = transformed?.tick;
+                if (tick) {
+                    const index = this.live_market_ribbon.findIndex(m => m?.symbol === tick.symbol);
+                    if (index !== -1) {
+                        runInAction(() => {
+                            const m = this.live_market_ribbon[index];
+                            if (!m) return;
+                            const price = parseFloat(tick.quote).toFixed(tick.pip_size || 2);
+                            m.is_up = parseFloat(price) >= parseFloat(String(m.price));
+                            m.price = price;
+                            m.digit = parseInt(price.slice(-1));
+                        });
+                    }
                 }
             }
         });
@@ -416,267 +425,181 @@ export default class MarketkillerStore {
         }
     };
 
+    /**
+     * Matches Killer Logic Engine
+     * Evaluates 6 configurable conditions against live digit stats to decide
+     * whether to fire parallel DIGITMATCH trades via directBuy.
+     */
     @action
-    private evaluateOnetrader = () => {
-        // Recovery Engine Overrides
-        let current_symbol = this.symbol;
-        let current_type = this.onetrader_settings.contract_type;
-        let current_stake = this.onetrader_settings.stake;
-        let current_barrier = this.onetrader_settings.barrier;
+    private evaluateMatchesKiller = async () => {
+        const settings = this.matches_settings;
+        const conditions = settings.enabled_conditions;
+        const stats = this.digit_stats;
+        if (stats.length < 10 || this.ticks.length < settings.check_ticks) return;
 
-        const is_recovery_step = this.onetrader_settings.enable_recovery && this.consecutive_losses > 0;
+        const sorted = [...stats].sort((a, b) => b.count - a.count);
+        const most = sorted[0];
+        const second = sorted[1];
+        const least = sorted[9];
 
-        if (is_recovery_step) {
-            const step_index = Math.min(this.consecutive_losses - 1, this.onetrader_settings.recovery_chain.length - 1);
-            const step = this.onetrader_settings.recovery_chain[step_index];
-            if (step) {
-                current_symbol = step.symbol;
-                current_type = step.contract_type;
-                current_stake *= step.stake_multiplier;
-                current_barrier = step.barrier ?? current_barrier;
-            }
+        let passed = 0;
+        const required = conditions.filter(Boolean).length;
+        if (required === 0) return;
+
+        // C1: Most-frequent digit percentage >= 15%
+        if (conditions[0] && most.percentage >= 15) passed++;
+        // C2: Gap between most and 2nd >= 3%
+        if (conditions[1] && most.percentage - second.percentage >= 3) passed++;
+        // C3: Least-frequent digit percentage <= 5%
+        if (conditions[2] && least.percentage <= 5) passed++;
+        // C4: Most-frequent count compare (configurable operator & value over N ticks)
+        if (conditions[3]) {
+            const recentSlice = this.ticks.slice(-settings.c4_ticks);
+            const c4Count = recentSlice.filter(d => d === most.digit).length;
+            const pass4 = settings.c4_op === '>='
+                ? c4Count >= settings.c4_val
+                : c4Count <= settings.c4_val;
+            if (pass4) passed++;
+        }
+        // C5: Power score of most-frequent digit is top-3
+        if (conditions[4]) {
+            const powers = this.digit_power_scores;
+            const sortedPowers = [...powers].map((p, i) => ({ digit: i, power: p })).sort((a, b) => b.power - a.power);
+            if (sortedPowers.slice(0, 3).some(s => s.digit === most.digit)) passed++;
+        }
+        // C6: Target rank digit appeared c6_count+ times in last check_ticks
+        if (conditions[5]) {
+            const targetDigit = settings.c6_target_rank === 'most' ? most.digit
+                : settings.c6_target_rank === '2nd' ? second.digit
+                : least.digit;
+            const recentSlice = this.ticks.slice(-settings.check_ticks);
+            const rankCount = recentSlice.filter(d => d === (targetDigit ?? -1)).length;
+            if (rankCount >= settings.c6_count) passed++;
         }
 
-        // Logic check: if using signals, only trade if power > 55
-        if (this.use_signals && !is_recovery_step) {
-            if (this.signal_power < 55) return; // Wait for better signal
-        }
+        if (passed < required) return;
 
-        const tradesToExecute = Array(this.onetrader_settings.bulk_count).fill({
-            type: current_type,
-            symbol: current_symbol,
-            barrier: current_barrier,
-            stake: current_stake,
-        });
+        // All enabled conditions passed — determine prediction targets
+        const sortedDigits = sorted.map(s => s.digit);
+        const targets: number[] = settings.is_auto
+            ? sortedDigits.slice(0, settings.simultaneous_trades || 1)
+            : Array.from({ length: settings.simultaneous_trades || 1 }).map((_, i) => settings.predictions[i] ?? 0);
 
-        this.executeConcurrentTrades(tradesToExecute);
-        runInAction(() => {
-            this.signal_detected = true;
-            setTimeout(() => runInAction(() => { this.signal_detected = false; }), 2000);
-        });
-        // Halt to prevent rapid-fire while evaluating execution resolution
-        this.is_running = false;
+        if (targets.length === 0) return;
+
+        const trades = targets.map(digit => ({
+            type: 'DIGITMATCH',
+            symbol: this.symbol,
+            barrier: digit,
+            stake: settings.stake,
+        }));
+
+        await this.executeConcurrentTrades(trades);
     };
 
+    /**
+     * Fires directBuy for each trade in parallel, then monitors each
+     * contract via proposal_open_contract until settlement.
+     */
     @action
-    private evaluateMatchesKiller = () => {
-        const most = this.matches_ranks.most;
-        const second = this.matches_ranks.second;
-        const least = this.matches_ranks.least;
+    private executeConcurrentTrades = async (trades: { type: string; symbol: string; barrier: number; stake: number }[]) => {
+        if (trades.length === 0 || !api_base.api) return;
 
-        if (most === null || second === null || least === null) return;
+        this.is_executing = true;
+        this.total_runs++;
 
-        const enabled = this.matches_settings.enabled_conditions;
-        
-        // Use sorted digits by count for Auto-Discovery
-        const sortedDigits = [...this.digit_stats].sort((a, b) => b.count - a.count).map(s => s.digit);
-        
-        // Strictly map to simultaneous_trades, using 0 as fallback for unedited manual slots
-        const final_targets: number[] = this.matches_settings.is_auto 
-            ? sortedDigits.slice(0, this.matches_settings.simultaneous_trades || 1)
-            : Array.from({ length: this.matches_settings.simultaneous_trades || 1 }).map((_, i) => this.matches_settings.predictions[i] ?? 0);
+        try {
+            const buyResults = await Promise.all(trades.map(t => this.directBuy(t)));
 
-        const shouldTradeDigit = (digit: number) => {
-            const stat = this.digit_stats.find(s => s.digit === digit);
-            if (!stat) return false;
+            for (const buyRes of buyResults) {
+                if (!buyRes?.buy?.contract_id) continue;
 
-            const powers = this.recent_powers;
-            const len = powers.length;
+                const contractId = buyRes.buy.contract_id;
+                const stake = parseFloat(buyRes.buy.buy_price || '0');
 
-            // Rule 2: Start if digit starts increasing in power
-            if (enabled[1]) {
-                if (len < 2) return false;
-                const lastPower = powers[len - 1][digit];
-                const prevPower = powers[len - 2][digit];
-                if (lastPower <= prevPower) return false;
-            }
-
-            // Rule 3: Start if digit increases simultaneously twice (consecutive)
-            if (enabled[2]) {
-                if (len < 3) return false;
-                const p1 = powers[len - 3][digit];
-                const p2 = powers[len - 2][digit];
-                const p3 = powers[len - 1][digit];
-                if (!(p3 > p2 && p2 > p1)) return false;
-            }
-
-            // Rule 4: If last 5 digits are Top 3
-            if (enabled[3]) {
-                const last5 = this.ticks.slice(-5);
-                const top3 = [most, second, least];
-                const allInTop3 = last5.every(d => top3.includes(d));
-                if (!allInTop3) return false;
-            }
-
-            // Probability Gate (C4 logic)
-            if (enabled[4]) {
-                const { c4_op: op, c4_val: val } = this.matches_settings;
-                const power = stat.percentage;
-                if (op === '>' && power <= val) return false;
-                if (op === '>=' && power < val) return false;
-                if (op === '==' && Math.abs(power - val) > 0.1) return false;
-                if (op === '<' && power >= val) return false;
-                if (op === '<=' && power > val) return false;
-            }
-
-            return true;
-        };
-
-        const valid_targets = final_targets.filter(shouldTradeDigit);
-
-        if (valid_targets.length > 0) {
-            // Execute ALL valid targets in a single concurrent burst
-            const trades = valid_targets.map(digit => ({
-                type: 'DIGITMATCH',
-                symbol: this.symbol,
-                barrier: digit,
-                stake: this.calculateMatchesStake(),
-            }));
-
-            console.log(`[Marketkiller] Placing ${trades.length} simultaneous trades for digits:`, valid_targets);
-            this.executeConcurrentTrades(trades);
-            
-            runInAction(() => {
-                this.signal_detected = true;
-                setTimeout(() => runInAction(() => { this.signal_detected = false; }), 2000);
-            });
-
-            // If NOT in auto-mode, shut down engine after one burst. 
-            // In AUTO-MODE, we keep it running but rely on is_executing to prevent overlaps.
-            if (!this.matches_settings.is_auto) {
-                this.is_running = false;
-            }
-        }
-    };
-
-    private calculateMatchesStake = () => {
-        let stake = this.matches_settings.stake || 0.35;
-        if (this.matches_settings.martingale_enabled && this.consecutive_losses > 0) {
-            stake = stake * Math.pow(this.matches_settings.martingale_multiplier, this.consecutive_losses);
-        }
-        return Number(Math.max(stake, 0.35).toFixed(2));
-    };
-
-    @action
-    private executeConcurrentTrades = async (tradeConfigs: any[]) => {
-        if (tradeConfigs.length === 0) return;
-        runInAction(() => { this.is_executing = true; });
-
-        console.log(`[Marketkiller] ⚡ Atomic burst: ${tradeConfigs.length} trade(s) — digits:`, tradeConfigs.map(c => c.barrier));
-
-        // ── ZERO-GAP SYNCHRONOUS FIRE ─────────────────────────────────────────
-        // All api.send() calls are started in a plain synchronous .map() loop
-        // — NO await between them. Every WebSocket message is queued in the
-        // SAME JavaScript event loop tick before any suspension occurs.
-        // This gives the absolute minimum gap between sends and guarantees all
-        // contracts open on the same entry tick → same entry AND exit spot.
-        const sendPromises: Promise<any>[] = tradeConfigs.map(config => {
-            const safeStake = Number(Math.max(config.stake || 0.35, 0.35).toFixed(2));
-            return api_base.api.send({
-                buy: '1',
-                price: safeStake,
-                parameters: {
-                    amount: safeStake,
-                    basis: 'stake',
-                    contract_type: config.type,
-                    currency: 'USD',
-                    duration: this.matches_settings.duration || 1,
-                    duration_unit: 't',
-                    symbol: config.symbol,
-                    barrier: String(config.barrier),
-                },
-            });
-        });
-
-        // Await all responses together.
-        const results = await Promise.allSettled(sendPromises);
-
-        const successfulTrades: Array<{ trade: any; config: any }> = [];
-        results.forEach((result, i) => {
-            if (result.status === 'fulfilled') {
-                const trade = result.value;
-                if (trade?.error) {
-                    const { code, message } = trade.error;
-                    console.error(`[Marketkiller] ❌ Digit ${tradeConfigs[i]?.barrier} rejected: [${code}] ${message}`);
-                    return;
-                }
-                if (!trade?.buy?.contract_id) {
-                    console.warn(`[Marketkiller] ❌ Digit ${tradeConfigs[i]?.barrier}: no contract_id`, trade);
-                    return;
-                }
-                console.log(`[Marketkiller] ✅ Digit ${tradeConfigs[i]?.barrier} confirmed | Contract ${trade.buy.contract_id}`);
-                successfulTrades.push({ trade, config: tradeConfigs[i] });
-            } else {
-                const msg = this.extractErrorMsg(result.reason);
-                console.error(`[Marketkiller] ❌ Digit ${tradeConfigs[i]?.barrier} exception: ${msg}`);
-            }
-        });
-
-        console.log(`[Marketkiller] Burst complete: ${successfulTrades.length}/${tradeConfigs.length} confirmed on same tick.`);
-
-        // ── Journal & Settlement Tracking ─────────────────────────────────────
-        successfulTrades.forEach(({ trade, config }) => {
-            const contractId = trade.buy.contract_id;
-
-            runInAction(() => {
-                this.total_stake_used += config.stake;
-                this.total_runs++;
-                this.trades_journal.unshift({
-                    id: contractId,
-                    market: config.symbol,
-                    type: config.type,
-                    prediction: config.barrier,
-                    stake: config.stake,
-                    time: new Date().toLocaleTimeString(),
-                    entry: trade.buy?.entry_spot_display_value ?? undefined,
-                    exit: undefined,
-                    status: 'PENDING',
+                runInAction(() => {
+                    this.total_stake_used += stake;
                 });
-            });
 
-            const sub = api_base.api.onMessage().subscribe((res: any) => {
-                const poc = res?.data?.proposal_open_contract;
-                if (
-                    res?.data?.msg_type === 'proposal_open_contract' &&
-                    poc?.contract_id === contractId &&
-                    poc?.is_sold
-                ) {
-                    runInAction(() => {
-                        if (poc.status === 'won') {
-                            this.wins++;
-                            this.consecutive_losses = 0;
-                        } else {
-                            this.losses++;
-                            this.consecutive_losses++;
-                        }
-                        this.session_pl += poc.profit;
+                try {
+                    const pocReq = transformRequest({
+                        proposal_open_contract: 1,
+                        contract_id: contractId,
+                        subscribe: 1,
+                    }, 'proposal_open_contract');
 
-                        const jIdx = this.trades_journal.findIndex(j => j.id === contractId);
-                        if (jIdx !== -1) {
-                            this.trades_journal[jIdx].status = poc.status.toUpperCase();
-                            this.trades_journal[jIdx].exit   = poc.exit_tick_display_value  ?? poc.exit_tick;
-                            this.trades_journal[jIdx].entry  = poc.entry_tick_display_value ?? poc.entry_tick;
-                            this.trades_journal[jIdx].profit = poc.profit;
-                        }
+                    api_base.api.send(pocReq).then((pocRes: any) => {
+                        this.handleContractSettlement(pocRes);
                     });
-                    try { sub.unsubscribe(); } catch (_) { /* ignore */ }
+
+                    if (api_base.api.onMessage) {
+                        const sub = api_base.api.onMessage().subscribe((res: any) => {
+                            if (
+                                res?.data?.msg_type === 'proposal_open_contract' &&
+                                res.data.proposal_open_contract?.contract_id === contractId
+                            ) {
+                                const transformed = transformResponse(res.data, 'proposal_open_contract');
+                                if (transformed?.proposal_open_contract?.is_sold) {
+                                    this.handleContractSettlement(transformed);
+                                    try { sub.unsubscribe(); } catch (_) { /* ignore */ }
+                                }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('[Marketkiller] POC subscribe error:', e);
                 }
-            });
+            }
+        } catch (e) {
+            console.error('[Marketkiller] executeConcurrentTrades error:', e);
+        }
 
-            api_base.api.send({
-                proposal_open_contract: 1,
-                contract_id: contractId,
-                subscribe: 1,
-            }).catch((e: any) => {
-                console.warn(`[Marketkiller] POC subscribe failed for ${contractId}:`, e?.error?.message || e);
-            });
-        });
-
-        // Release execution lock after trades are initiated and settled (or timeout)
-        // We wait a small buffer to ensure the socket isn't flooded and ticks have progressed.
+        // Release execution lock after a safety buffer
         setTimeout(() => {
             runInAction(() => { this.is_executing = false; });
         }, 1500);
+    };
+
+    /** Handle a settled contract — update W/L stats and journal */
+    @action
+    private handleContractSettlement = (response: any) => {
+        const poc = response?.proposal_open_contract;
+        if (!poc?.is_sold) return;
+
+        const profit = parseFloat(poc.profit || '0');
+        const status = poc.status;
+
+        runInAction(() => {
+            if (status === 'won') {
+                this.wins++;
+                this.consecutive_losses = 0;
+            } else {
+                this.losses++;
+                this.consecutive_losses++;
+            }
+            this.session_pl += profit;
+
+            this.trades_journal.push({
+                contract_id: poc.contract_id,
+                type: poc.contract_type,
+                symbol: poc.underlying,
+                barrier: poc.barrier,
+                stake: poc.buy_price,
+                payout: poc.payout,
+                profit,
+                status,
+                timestamp: Date.now(),
+            });
+
+            // Martingale: increase stake on loss
+            if (status !== 'won' && this.matches_settings.martingale_enabled) {
+                this.matches_settings.stake = parseFloat(
+                    (this.matches_settings.stake * (1 + this.matches_settings.martingale_multiplier)).toFixed(2)
+                );
+            } else if (status === 'won' && this.matches_settings.martingale_enabled) {
+                this.matches_settings.stake = Math.max(0.35, this.matches_settings.stake);
+            }
+        });
     };
 
     @action
@@ -694,7 +617,6 @@ export default class MarketkillerStore {
     public executeOneShot = async () => {
         const sortedDigits = [...this.digit_stats].sort((a, b) => b.count - a.count).map(s => s.digit);
         
-        // Ensure we fetch EXACTLY the number of active slots chosen by the user. Unedited slots will default to '0'.
         const targets: number[] = this.matches_settings.is_auto 
             ? sortedDigits.slice(0, this.matches_settings.simultaneous_trades || 1)
             : Array.from({ length: this.matches_settings.simultaneous_trades || 1 }).map((_, i) => this.matches_settings.predictions[i] ?? 0);
