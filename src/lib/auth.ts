@@ -56,22 +56,22 @@ export async function handleCallback(): Promise<{ success: boolean; error?: stri
     try {
         const redirect_uri = getRedirectUri();
         const code_verifier_short = codeVerifier.substring(0, 20) + '...';
-        console.log('📤 [Frontend] Sending to /api/auth/exchange-token:', { 
-            code: code.substring(0, 20) + '...', 
-            code_verifier: code_verifier_short, 
-            redirect_uri 
+        console.log('📤 [Frontend] Sending to /api/auth/exchange-token:', {
+            code: code.substring(0, 20) + '...',
+            code_verifier: code_verifier_short,
+            redirect_uri,
         });
         // Use our server-side exchange endpoint to avoid CORS issues and to allow the server to set HTTP-only cookies
         const response = await fetch('/api/auth/exchange-token', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: new URLSearchParams({
+            body: JSON.stringify({
                 code,
                 code_verifier: codeVerifier,
                 redirect_uri,
-            }).toString(),
+            }),
         });
 
         if (!response.ok) {

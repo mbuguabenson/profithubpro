@@ -6,21 +6,31 @@ const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || '33pC7qk8i9WtRbTbSOkcq';
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://profithubpro.vercel.app/callback';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    res.setHeader('Allow', 'POST,OPTIONS');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    let body = req.body;
+    let body: any = req.body;
     if (typeof body === 'string') {
         try {
-            const params = new URLSearchParams(body);
-            body = {
-                code: params.get('code'),
-                code_verifier: params.get('code_verifier'),
-                redirect_uri: params.get('redirect_uri'),
-            };
-        } catch (e) {
-            body = {};
+            body = JSON.parse(body);
+        } catch {
+            try {
+                const params = new URLSearchParams(body);
+                body = {
+                    code: params.get('code'),
+                    code_verifier: params.get('code_verifier'),
+                    redirect_uri: params.get('redirect_uri'),
+                };
+            } catch (e) {
+                body = {};
+            }
         }
     }
 
